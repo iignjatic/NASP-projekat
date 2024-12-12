@@ -8,187 +8,200 @@ import (
 )
 
 type countMinSketch struct {
-	tabela      [][]uint
-	hesFunkcije []HashWithSeed
-	k           uint
-	m           uint
+	table         [][]uint
+	hashFunctions []HashWithSeed
+	k             uint
+	m             uint
 }
 
-func napraviCountMinScetch(epsilon, delta float64) countMinSketch {
+func createCountMinScetch(epsilon, delta float64) countMinSketch {
 	k := CalculateK(delta)
 	m := CalculateM(epsilon)
-	hesFunkcije := CreateHashFunctions(k)
-	tabela := make([][]uint, k)
-	for i := range tabela {
-		tabela[i] = make([]uint, m)
+	hashFunctions := CreateHashFunctions(k)
+	table := make([][]uint, k)
+	for i := range table {
+		table[i] = make([]uint, m)
 	}
 
 	return countMinSketch{
-		tabela:      tabela,
-		hesFunkcije: hesFunkcije,
-		k:           k,
-		m:           m,
+		table:         table,
+		hashFunctions: hashFunctions,
+		k:             k,
+		m:             m,
 	}
 
 }
 
-func dodajElement(countMinSketch *countMinSketch, kljuc []byte) {
-	hesVrijednosti := make([]uint64, countMinSketch.k)
-	for i := range countMinSketch.hesFunkcije {
-		hesVrijednosti[i] = countMinSketch.hesFunkcije[i].Hash(kljuc)
-		j := hesVrijednosti[i] % uint64(countMinSketch.m)
-		countMinSketch.tabela[i][j]++
+func addElement(countMinSketch *countMinSketch, key []byte) {
+	hashValues := make([]uint64, countMinSketch.k)
+	for i := range countMinSketch.hashFunctions {
+		hashValues[i] = countMinSketch.hashFunctions[i].Hash(key)
+		j := hashValues[i] % uint64(countMinSketch.m)
+		countMinSketch.table[i][j]++
 	}
 
 }
 
-func nadjiUcestalost(countMinSketch *countMinSketch, kljuc []byte) uint {
-	hesVrijednosti := make([]uint64, countMinSketch.k)
-	odgovarajuceVrijednostiZaKljuc := make([]uint, countMinSketch.k)
-	for i := range countMinSketch.hesFunkcije {
-		hesVrijednosti[i] = countMinSketch.hesFunkcije[i].Hash(kljuc)
-		j := hesVrijednosti[i] % uint64(countMinSketch.m)
-		odgovarajuceVrijednostiZaKljuc[i] = countMinSketch.tabela[i][j]
+func findFrequency(countMinSketch *countMinSketch, key []byte) uint {
+	hashValues := make([]uint64, countMinSketch.k)
+	valuesForKey := make([]uint, countMinSketch.k)
+	for i := range countMinSketch.hashFunctions {
+		hashValues[i] = countMinSketch.hashFunctions[i].Hash(key)
+		j := hashValues[i] % uint64(countMinSketch.m)
+		valuesForKey[i] = countMinSketch.table[i][j]
 
 	}
 
-	najmanji := uint(999999)
-	for i := range odgovarajuceVrijednostiZaKljuc {
-		if uint(odgovarajuceVrijednostiZaKljuc[i]) < najmanji {
-			najmanji = uint(odgovarajuceVrijednostiZaKljuc[i])
+	min := uint(999999)
+	for i := range valuesForKey {
+		if uint(valuesForKey[i]) < min {
+			min = uint(valuesForKey[i])
 		}
 	}
 
-	return uint(najmanji)
+	return uint(min)
 
 }
 
-func (cms *countMinSketch) serijalizuj(imeFajla string) {
-	fajl, err := os.Create(imeFajla)
+func (cms *countMinSketch) serialize(filename string) {
+	file, err := os.Create(filename)
 	if err != nil {
-		log.Fatalf("Greska pri kreiranju fajla: %v", err)
+		log.Fatalf("Creating file error: %v", err)
 	}
-	defer fajl.Close()
+	defer file.Close()
 
-	var bajtovi []byte
-	kBajtovi := make([]byte, 4)
-	mBajtovi := make([]byte, 4)
-	binary.LittleEndian.PutUint32(kBajtovi, uint32(cms.k))
-	binary.LittleEndian.PutUint32(mBajtovi, uint32(cms.m))
-	bajtovi = append(bajtovi, kBajtovi...)
-	bajtovi = append(bajtovi, mBajtovi...)
+	var bytes []byte
+	kBytes := make([]byte, 4)
+	mBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(kBytes, uint32(cms.k))
+	binary.LittleEndian.PutUint32(mBytes, uint32(cms.m))
+	bytes = append(bytes, kBytes...)
+	bytes = append(bytes, mBytes...)
 
-	for _, red := range cms.tabela {
-		duzinaReda := make([]byte, 4)
-		binary.LittleEndian.PutUint32(duzinaReda, uint32(len(red)))
-		bajtovi = append(bajtovi, duzinaReda...)
-		for _, vrijednost := range red {
-			vrijednostBajtovi := make([]byte, 4)
-			binary.LittleEndian.PutUint32(vrijednostBajtovi, uint32(vrijednost))
-			bajtovi = append(bajtovi, vrijednostBajtovi...)
+	for _, row := range cms.table {
+		rowLength := make([]byte, 4)
+		binary.LittleEndian.PutUint32(rowLength, uint32(len(row)))
+		bytes = append(bytes, rowLength...)
+		for _, value := range row {
+			bytesValue := make([]byte, 4)
+			binary.LittleEndian.PutUint32(bytesValue, uint32(value))
+			bytes = append(bytes, bytesValue...)
 		}
 
 	}
 
-	brojFunkcija := make([]byte, 4)
-	binary.LittleEndian.PutUint32(brojFunkcija, uint32(len(cms.hesFunkcije)))
-	bajtovi = append(bajtovi, brojFunkcija...)
-	for _, hesFunkcija := range cms.hesFunkcije {
-		duzinaSeed := make([]byte, 4)
-		binary.LittleEndian.PutUint32(duzinaSeed, uint32(len(hesFunkcija.Seed)))
-		bajtovi = append(bajtovi, duzinaSeed...)
-		bajtovi = append(bajtovi, hesFunkcija.Seed...)
+	numberOfFunctions := make([]byte, 4)
+	binary.LittleEndian.PutUint32(numberOfFunctions, uint32(len(cms.hashFunctions)))
+	bytes = append(bytes, numberOfFunctions...)
+	for _, hashFunction := range cms.hashFunctions {
+		seedLength := make([]byte, 4)
+		binary.LittleEndian.PutUint32(seedLength, uint32(len(hashFunction.Seed)))
+		bytes = append(bytes, seedLength...)
+		bytes = append(bytes, hashFunction.Seed...)
 	}
 
-	_, err = fajl.Write(bajtovi)
+	_, err = file.Write(bytes)
 	if err != nil {
-		log.Fatalf("Greska pri upisivanju bajtova u fajl: %v", err)
+		log.Fatalf("Error in writing bytes in file: %v", err)
 	}
 
 }
 
-func (cms *countMinSketch) deserijalizuj(imeFajla string) {
-	fajl, err := os.Open(imeFajla)
+func (cms *countMinSketch) deserialize(filename string) {
+	file, err := os.Open(filename)
 	if err != nil {
-		log.Fatalf("Greska pri otvaranju fajla: %v", err)
+		log.Fatalf("Error in opening file: %v", err)
 	}
 
-	defer fajl.Close()
+	defer file.Close()
 
-	var bajtovi []byte
+	var bytes []byte
 
-	podaciFajl, err := fajl.Stat()
+	dataInFile, err := file.Stat()
 	if err != nil {
-		log.Fatalf("Greska pri citanju podataka o fajlu: %v", err)
+		log.Fatalf("Error in reading data about file: %v", err)
 	}
 
-	velicinaFajla := podaciFajl.Size()
-	bajtovi = make([]byte, velicinaFajla)
-	_, err = fajl.Read(bajtovi)
+	fileSize := dataInFile.Size()
+	bytes = make([]byte, fileSize)
+	_, err = file.Read(bytes)
 	if err != nil {
-		log.Fatalf("Greska pri citanju fajla: %v", err)
+		log.Fatalf("Error in reading file: %v", err)
 	}
 
-	cms.k = uint(binary.LittleEndian.Uint32(bajtovi[:4]))
-	cms.m = uint(binary.LittleEndian.Uint32(bajtovi[4:8]))
-	bajtovi = bajtovi[8:]
+	cms.k = uint(binary.LittleEndian.Uint32(bytes[:4]))
+	cms.m = uint(binary.LittleEndian.Uint32(bytes[4:8]))
+	bytes = bytes[8:]
 
-	cms.tabela = make([][]uint, cms.k)
+	cms.table = make([][]uint, cms.k)
 	for i := uint(0); i < cms.k; i++ {
-		duzinaReda := binary.LittleEndian.Uint32(bajtovi[:4])
-		bajtovi = bajtovi[4:]
-		cms.tabela[i] = make([]uint, duzinaReda)
-		for j := 0; j < int(duzinaReda); j++ {
-			cms.tabela[i][j] = uint(binary.LittleEndian.Uint32(bajtovi[:4]))
-			bajtovi = bajtovi[4:]
+		rowLength := binary.LittleEndian.Uint32(bytes[:4])
+		bytes = bytes[4:]
+		cms.table[i] = make([]uint, rowLength)
+		for j := 0; j < int(rowLength); j++ {
+			cms.table[i][j] = uint(binary.LittleEndian.Uint32(bytes[:4]))
+			bytes = bytes[4:]
 		}
 
 	}
 
-	brojFunkcija := binary.LittleEndian.Uint32(bajtovi[:4])
-	bajtovi = bajtovi[4:]
-	cms.hesFunkcije = make([]HashWithSeed, brojFunkcija)
+	numberOfFunctions := binary.LittleEndian.Uint32(bytes[:4])
+	bytes = bytes[4:]
+	cms.hashFunctions = make([]HashWithSeed, numberOfFunctions)
 
-	for i := 0; i < int(brojFunkcija); i++ {
-		duzinaSeed := binary.LittleEndian.Uint32(bajtovi[:4])
-		bajtovi = bajtovi[4:]
-		cms.hesFunkcije[i].Seed = make([]byte, duzinaSeed)
-		copy(cms.hesFunkcije[i].Seed, bajtovi[:duzinaSeed])
-		bajtovi = bajtovi[duzinaSeed:]
+	for i := 0; i < int(numberOfFunctions); i++ {
+		seedLength := binary.LittleEndian.Uint32(bytes[:4])
+		bytes = bytes[4:]
+		cms.hashFunctions[i].Seed = make([]byte, seedLength)
+		copy(cms.hashFunctions[i].Seed, bytes[:seedLength])
+		bytes = bytes[seedLength:]
 
 	}
 
 }
+
+func (cms *countMinSketch) delete() {
+	cms.table = nil
+	cms.hashFunctions = nil
+	cms.k = 0
+	cms.m = 0
+}
+
 func main() {
 	epsilon := 0.01
 	delta := 0.01
-	countMinSketch := napraviCountMinScetch(epsilon, delta)
+	countMinSketch := createCountMinScetch(epsilon, delta)
 
 	kljuc1 := []byte("jabuka")
 	kljuc2 := []byte("banana")
 	kljuc3 := []byte("narandza")
 	kljuc4 := []byte("jabuka")
 
-	dodajElement(&countMinSketch, kljuc1)
-	dodajElement(&countMinSketch, kljuc2)
-	dodajElement(&countMinSketch, kljuc3)
-	dodajElement(&countMinSketch, kljuc4)
+	addElement(&countMinSketch, kljuc1)
+	addElement(&countMinSketch, kljuc2)
+	addElement(&countMinSketch, kljuc3)
+	addElement(&countMinSketch, kljuc4)
 
-	fmt.Printf("Ucestalost jabuke je: %d\n", nadjiUcestalost(&countMinSketch, kljuc1))
-	fmt.Printf("Ucestalost banane je: %d\n", nadjiUcestalost(&countMinSketch, kljuc2))
-	fmt.Printf("Ucestalost narandze je: %d\n", nadjiUcestalost(&countMinSketch, kljuc3))
+	fmt.Printf("Ucestalost jabuke je: %d\n", findFrequency(&countMinSketch, kljuc1))
+	fmt.Printf("Ucestalost banane je: %d\n", findFrequency(&countMinSketch, kljuc2))
+	fmt.Printf("Ucestalost narandze je: %d\n", findFrequency(&countMinSketch, kljuc3))
 
 	imeFajla := "countMinSketch_podaci.bin"
-	countMinSketch.serijalizuj(imeFajla)
+	countMinSketch.serialize(imeFajla)
 	fmt.Println("Uspijesno sam serijalizovao u fajl")
 
 	countMinSketch2 := countMinSketch
 
-	countMinSketch2.deserijalizuj(imeFajla)
+	countMinSketch2.deserialize(imeFajla)
 	fmt.Println("Uspijesno sam deserijalizovao iz fajla")
 
-	fmt.Printf("Ucestalost jabuke (posle deserijalizacije) je: %d\n", nadjiUcestalost(&countMinSketch2, kljuc1))
-	fmt.Printf("Ucestalost banane (posle deserijalizacije) je: %d\n", nadjiUcestalost(&countMinSketch2, kljuc2))
-	fmt.Printf("Ucestalost narandze (posle deserijalizacije) je: %d\n", nadjiUcestalost(&countMinSketch2, kljuc3))
+	fmt.Printf("Ucestalost jabuke (posle deserijalizacije) je: %d\n", findFrequency(&countMinSketch2, kljuc1))
+	fmt.Printf("Ucestalost banane (posle deserijalizacije) je: %d\n", findFrequency(&countMinSketch2, kljuc2))
+	fmt.Printf("Ucestalost narandze (posle deserijalizacije) je: %d\n", findFrequency(&countMinSketch2, kljuc3))
+
+	countMinSketch.delete()
+	if countMinSketch.hashFunctions == nil && countMinSketch.table == nil && countMinSketch.k == 0 && countMinSketch.m == 0 {
+		fmt.Println("Uspijesno obrisan countMinSketch")
+	}
 
 }
