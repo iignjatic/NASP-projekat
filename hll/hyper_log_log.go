@@ -7,6 +7,12 @@ import (
 	"math/bits"
 )
 
+//DODAJ
+//Rad sa tipom HyperLogLog
+// Kreiranje nove instance
+// Brisanje postojeće instance
+// SERIJALIZACIJA
+
 const (
 	HLL_MIN_PRECISION = 4
 	HLL_MAX_PRECISION = 16
