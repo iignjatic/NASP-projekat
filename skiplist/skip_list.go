@@ -6,7 +6,7 @@ import (
 
 type Node struct {
 	key   string
-	value string
+	value []byte
 	next  []*Node
 }
 
@@ -38,7 +38,7 @@ povratna vrijednost: nil
 prvo se odredjuje broj nivoa na kojima ce se pojavljivati cvor
 dalje se prevezuju pokazivaci
 */
-func (s *SkipList) addElement(key string, value string) {
+func (s *SkipList) addElement(key string, value []byte) {
 	levels := s.roll()
 	newNode := &Node{
 		key:   key,
@@ -102,17 +102,17 @@ func (s *SkipList) removeElement(key string) {
 
 /*
 func main() {
-	s := SkipList{head: &Node{next: make([]*Node, 4)}, maxHeight: 3}
-	s.addElement("key1", "value1")
-	s.addElement("key2", "value2")
-	s.addElement("key3", "value3")
+	s := SkipList{head: &Node{next: make([]*Node, 7)}, maxHeight: 6}
+	s.addElement("key1", []byte("value1"))
+	s.addElement("key2", []byte("value2"))
+	s.addElement("key3", []byte("value3"))
 
 	//key := "key8"
 	key := "key3"
 
 	node := s.searchElement(key)
 	if node != nil {
-		fmt.Printf("Found key: %s, value %s", node.key, node.value)
+		fmt.Printf("Found key: %s, value %s", node.key, string(node.value))
 		fmt.Println()
 	} else {
 		fmt.Printf("Key %s not found\n", key)
