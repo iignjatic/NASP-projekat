@@ -1,4 +1,4 @@
-package sstable
+package SSTable
 
 import (
 	"NASP-PROJEKAT/data"
