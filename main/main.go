@@ -1,14 +1,14 @@
 package main
 
 import (
+	"NASP-PROJEKAT/SSTable"
 	"NASP-PROJEKAT/data"
-	"NASP-PROJEKAT/sstable"
 	"fmt"
 )
 
 func main() {
-	table := sstable.SSTable{
-		DataSegment: &sstable.DataSegment{BlockSize: 5, SegmentSize: 10},
+	table := SSTable.SSTable{
+		DataSegment: &SSTable.DataSegment{},
 	}
 
 	records := []data.Record{
