@@ -17,7 +17,8 @@ func main() {
 		{Crc: 54321, KeySize: 3, ValueSize: 5, Key: "key3", Value: []byte("val3"), Tombstone: false, Timestamp: "2024-06-16"},
 		{Crc: 12345, KeySize: 3, ValueSize: 5, Key: "key1", Value: []byte("val1"), Tombstone: false, Timestamp: "2024-06-14"},
 		{Crc: 67890, KeySize: 3, ValueSize: 5, Key: "key2", Value: []byte("val2"), Tombstone: true, Timestamp: "2024-06-15"},
-		{Crc: 54321, KeySize: 3, ValueSize: 5, Key: "key3", Value: []byte("val3"), Tombstone: false, Timestamp: "2024-06-16"}, {Crc: 12345, KeySize: 3, ValueSize: 5, Key: "key1", Value: []byte("val1"), Tombstone: false, Timestamp: "2024-06-14"},
+		{Crc: 54321, KeySize: 3, ValueSize: 5, Key: "key3", Value: []byte("val3"), Tombstone: false, Timestamp: "2024-06-16"},
+		{Crc: 12345, KeySize: 3, ValueSize: 5, Key: "key1", Value: []byte("val1"), Tombstone: false, Timestamp: "2024-06-14"},
 		{Crc: 67890, KeySize: 3, ValueSize: 5, Key: "key2", Value: []byte("val2"), Tombstone: true, Timestamp: "2024-06-15"},
 		{Crc: 54321, KeySize: 3, ValueSize: 5, Key: "key3", Value: []byte("val3"), Tombstone: false, Timestamp: "2024-06-16"},
 	}
