@@ -3,12 +3,17 @@ package main
 import (
 	"NASP-PROJEKAT/SSTable"
 	"NASP-PROJEKAT/data"
-	"fmt"
 )
 
 func main() {
-	table := SSTable.SSTable{
-		DataSegment: &SSTable.DataSegment{},
+
+	dataSeg := &SSTable.DataSegment{
+		FilePath: "../SSTable/f.bin",
+	}
+
+	// Kreiranje SSTable-a
+	sst := &SSTable.SSTable{
+		DataSegment: dataSeg,
 	}
 
 	records := []data.Record{
@@ -23,7 +28,11 @@ func main() {
 	for i := range records {
 		recordPtrs = append(recordPtrs, &records[i])
 	}
-	table.MakeSSTable(recordPtrs)
-	fmt.Println("SSTable sa segmentima: ", table.DataSegment.Blocks)
+	sst.DataSegment.MakeSegment(recordPtrs)
+
+	//table.MakeSSTable(recordPtrs)
+
+	//table.Index.MakeIndex(table.DataSegment.Blocks, table.DataSegment.SegmentSize)
+	//fmt.Println("SSTable sa segmentima: ", table.DataSegment.Blocks)
 
 }
