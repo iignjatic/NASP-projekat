@@ -11,7 +11,7 @@ type Block struct {
 	CurrentCapacity uint32
 }
 
-func NewBlock(BlockID, FullCapacity int, records []*Record) Block {
+func NewBlock(BlockID, FullCapacity int, records []*Record) *Block {
 	var allRecords []byte
 	for _, record := range records {
 		recordBytes, err := record.ToBytes()
@@ -22,7 +22,7 @@ func NewBlock(BlockID, FullCapacity int, records []*Record) Block {
 		allRecords = append(allRecords, recordBytes...)
 	}
 
-	return Block{
+	return &Block{
 		ID:              BlockID,
 		Records:         allRecords,
 		FullCapacity:    uint32(FullCapacity),

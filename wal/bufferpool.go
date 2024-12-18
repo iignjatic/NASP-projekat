@@ -24,9 +24,9 @@ func (bp *BufferPool) AddBlock(blockID int, records []*Record) {
 	
 	newBlock := NewBlock(blockID, BlockSize, records)
 
-	bp.Blocks = append(bp.Blocks, &newBlock)
+	bp.Blocks = append(bp.Blocks, newBlock)
 	bp.CurrentCapacity++;
-	fmt.Printf("Block with id %d added in Buffer Pool.\n", blockID)
+	fmt.Printf("Block with id %d added to Buffer Pool.\n", blockID)
 }
 
 func (bp *BufferPool) FlushToDisk() {
