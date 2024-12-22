@@ -1,8 +1,7 @@
-package main
+package bloomfilter
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"os"
 )
@@ -243,7 +242,7 @@ func (bf *BloomFilter) deserialize(filename string) error {
 	return nil
 }
 
-func main() {
+/*func main() {
 	bf := createBloomFilter(1000, 0.01)
 	bf2 := bf
 	bf.addElement("jabuka")
@@ -264,4 +263,4 @@ func main() {
 	if bf.bitset == nil && bf.hashFuncs == nil && bf.k == 0 && bf.m == 0 {
 		fmt.Println("Fajl je obrisan")
 	}
-}
+}*/
