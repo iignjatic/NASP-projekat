@@ -15,9 +15,9 @@ func (summary *Summary) MakeSummary(records []*data.Record, sample uint32) {
 	var offset uint32 = 0
 	var counter uint32 = 0
 	for i := 0; i < len(records); i++ {
-		recordSize := getRecordSize(records[i])
+		indexRecordSize := records[i].KeySize + 8
 		counter++
-		offset += recordSize
+		offset += indexRecordSize
 		if counter == sample {
 			summary.SummaryTable[records[i].Key] = offset
 			counter = 0
