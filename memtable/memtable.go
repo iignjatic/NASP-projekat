@@ -26,6 +26,12 @@ type Memtable struct {
 	currentSize uint
 }
 
+type MemtableManager struct {
+	tables    []*Memtable
+	maxTables uint
+	mutex     sync.Mutex
+}
+
 func CreateMemtable(maxSize uint, readOnly bool) *Memtable {
 	return &Memtable{
 		data:        make(map[string]*Record),
@@ -35,6 +41,21 @@ func CreateMemtable(maxSize uint, readOnly bool) *Memtable {
 	}
 }
 
+func CreateMemtableManager(maxTables, tableSize uint) *MemtableManager {
+	manager := &MemtableManager{
+		tables:    make([]*Memtable, 0, maxTables),
+		maxTables: maxTables,
+	}
+
+	// N-1 read-only tabela i 1 read-write tabela
+	for i := 0; i < int(maxTables)-1; i++ {
+		manager.tables = append(manager.tables, CreateMemtable(tableSize, true))
+	}
+	manager.tables = append(manager.tables, CreateMemtable(tableSize, false))
+	return manager
+}
+
+// funkcija dodavanja record-a kod rada sa samo jednom mem tabelom
 func (memt *Memtable) Put(record Record) error {
 	memt.mutex.Lock()
 	defer memt.mutex.Unlock()
@@ -44,11 +65,28 @@ func (memt *Memtable) Put(record Record) error {
 	}
 
 	if memt.currentSize >= memt.maxSize {
-		return errors.New("memtable is full, flush required")
+		return errors.New("memtable is full")
 	}
 
 	memt.data[record.Key] = &record
 	memt.currentSize++
+	return nil
+}
+
+func (mm *MemtableManager) Put(record Record) error {
+	mm.mutex.Lock()
+	defer mm.mutex.Unlock()
+
+	activeTable := mm.tables[len(mm.tables)-1]
+	if err := activeTable.Put(record); err != nil {
+		if err.Error() == "memtable is full" {
+			if err := mm.Flush(); err != nil {
+				return err
+			}
+			return activeTable.Put(record)
+		}
+		return err
+	}
 	return nil
 }
 
@@ -88,6 +126,21 @@ func (memt *Memtable) Flush() ([]Record, error) {
 	memt.data = make(map[string]*Record)
 	memt.currentSize = 0
 	return records, nil
+}
+
+func (mm *MemtableManager) Flush() error {
+	mm.mutex.Lock()
+	defer mm.mutex.Unlock()
+
+	fmt.Println("Flushing Memtables...")
+	for i := 0; i < len(mm.tables)-1; i++ {
+		records, err := mm.tables[i].Flush()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Flushed table %d: %+v\n", i, records)
+	}
+	return nil
 }
 
 // ukljanja zastarjele ili nepotrebne podatke iz prethodnih SSTable-ova
