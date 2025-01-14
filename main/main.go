@@ -29,7 +29,7 @@ func main() {
 		if input == 1 {
 			//GET operacija
 
-			fmt.Scan(&key, &value)
+			fmt.Scan(&key)
 
 			/* if SEARCHMEMTABLE != nil
 				continue
@@ -48,6 +48,8 @@ func main() {
 		} else if input == 2 {
 			//PUT OPERACIJA
 
+			fmt.Scan(&key, &value)
+
 			/*
 				writeToWAL
 
@@ -61,6 +63,7 @@ func main() {
 		} else if input == 3 {
 
 			//DELETE OPERACIJA
+			fmt.Scan(&key)
 
 			/*
 				updateWAL
