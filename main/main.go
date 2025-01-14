@@ -9,24 +9,21 @@ func main() {
 
 	dataSeg := &SSTable.DataSegment{}
 
-	index := &SSTable.Index{
-		IndexTable: make(map[string]uint32),
-	}
+	index := &SSTable.Index{}
 
-	summary := &SSTable.Summary{
-		SummaryTable: make(map[string]uint32),
-	}
+	summary := &SSTable.Summary{}
 
 	blockManager := &SSTable.BlockManager{}
 
 	// Kreiranje SSTable-a
 	sst := &SSTable.SSTable{
-		DataSegment:   dataSeg,
-		Index:         index,
-		Summary:       summary,
-		BlockManager:  blockManager,
-		DataFilePath:  "../SSTable/data.bin",
-		IndexFilePath: "../SSTable/index.bin",
+		DataSegment:     dataSeg,
+		Index:           index,
+		Summary:         summary,
+		BlockManager:    blockManager,
+		DataFilePath:    "../SSTable/files/data.bin",
+		IndexFilePath:   "../SSTable/files/index.bin",
+		SummaryFilePath: "../SSTable/files/summary.bin",
 	}
 
 	records := []data.Record{
@@ -43,9 +40,6 @@ func main() {
 	}
 	sst.MakeSSTable(recordPtrs)
 
-	//index.MakeIndex(recordPtrs)
-	summary.MakeSummary(recordPtrs, 2)
-	//fmt.Println("SSTable sa segmentima: ", table.DataSegment.Blocks)
 	sst.Index = index
 	sst.Summary = summary
 

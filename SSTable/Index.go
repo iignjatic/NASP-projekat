@@ -6,10 +6,10 @@ import (
 )
 
 type Index struct {
-	IndexTable    map[string]uint32
 	Blocks        []*Block
 	SegmentSize   uint32
 	IndexFilePath string
+	//	IndexTable    map[string]uint32
 }
 
 func (index *Index) MakeIndex(records []*data.Record) {
