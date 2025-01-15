@@ -62,21 +62,23 @@ func (sst *SSTable) getSummarySize(records []*data.Record) uint32 {
 func (sstable *SSTable) MakeSSTable(records []*data.Record) {
 	//blokovi za data segment
 	DataSize := sstable.getDataSize(records) //ukupna velicina data dijela
-	sstable.DataSegment.Blocks = make([]*Block, DataSize/BlockSize+1)
+	sstable.DataSegment.Blocks = make([]*Block, DataSize/BlockSize*2)
 	for i := range sstable.DataSegment.Blocks {
 		sstable.DataSegment.Blocks[i] = &Block{} // Inicijalizacija svakog bloka
 	}
 
 	//blokovi za indeks
 	IndexSize := sstable.getIndexSize(records) //ukupna velicina indeksa
-	sstable.Index.Blocks = make([]*Block, IndexSize/BlockSize+1)
+	sstable.Index.Blocks = make([]*Block, IndexSize/BlockSize*2)
 	for i := range sstable.Index.Blocks {
 		sstable.Index.Blocks[i] = &Block{} // Inicijalizacija svakog bloka
 	}
 
 	//blokovi za summary
-	SummarySize := sstable.getSummarySize(records) //ukupna velicina indeksa
-	sstable.Summary.Blocks = make([]*Block, SummarySize/BlockSize+1)
+	sstable.Summary.Sample = 2 //OVDJE TREBA SAMPLE !!!!!!
+
+	SummarySize := sstable.getSummarySize(records) //ukupna velicina samarija
+	sstable.Summary.Blocks = make([]*Block, SummarySize/BlockSize*2)
 	for i := range sstable.Summary.Blocks {
 		sstable.Summary.Blocks[i] = &Block{} // Inicijalizacija svakog bloka
 	}
@@ -89,7 +91,6 @@ func (sstable *SSTable) MakeSSTable(records []*data.Record) {
 		sstable.Summary.First = records[0].Key
 		sstable.Summary.Last = records[len(records)-1].Key
 	}
-	sstable.Summary.Sample = 2 //OVDJE TREBA SAMPLE !!!!!!
 
 	sstable.MakeBlocks('d', records)
 	sstable.MakeBlocks('i', records)
