@@ -7,6 +7,21 @@ import (
 	"time"
 )
 
+const (
+	CRC_SIZE = 4
+	TIMESTAMP_SIZE = 8
+	TOMBSTONE_SIZE = 1
+	KEY_SIZE = 8
+	VALUE_SIZE = 8
+
+	CRC_START = 0
+	TIMESTAMP_START = CRC_START + CRC_SIZE
+	TOMBSTONE_START = TIMESTAMP_START + TIMESTAMP_SIZE
+	KEY_SIZE_START = TOMBSTONE_START + TOMBSTONE_SIZE
+	VALUE_SIZE_START = KEY_SIZE_START + KEY_SIZE
+	KEY_START = VALUE_SIZE_START + VALUE_SIZE
+)
+
 /*
    +---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
    |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
@@ -22,24 +37,24 @@ import (
 
 type Record struct {
 	Crc       uint32
+	Timestamp int64 
+	Tombstone bool
 	KeySize   uint64
 	ValueSize uint64
 	Key       string
 	Value     []byte
-	Tombstone bool
-	Timestamp string
 }
 
-func NewRecord(key string, value []byte, tombstone bool) *Record {
-	timestamp := time.Now().UTC().Format(time.RFC3339)
+func NewRecord(key string, value []byte) *Record {
+	timestamp := time.Now().UTC().Unix()
 	return &Record{
 		Crc: 0, // computed during serialization
+		Timestamp: timestamp,
+		Tombstone: false, // default value
 		KeySize: uint64(len(key)),
 		ValueSize: uint64(len(value)),
 		Key: key,
 		Value: value,
-		Tombstone: tombstone,
-		Timestamp: timestamp,
 	}
 }
 
@@ -50,95 +65,105 @@ func CRC32(data []byte) uint32 {
 func (r *Record) ToBytes() ([]byte, error) {
 	keySize := len(r.Key)
 	valueSize := len(r.Value)
-	timestampSize := len(r.Timestamp)
-	totalSize := 4 + 8 + 8 + keySize + valueSize + 1 + timestampSize
 
-	bytesArray := make([]byte, totalSize)
-	offset := 0
-	
-	// Placeholder for CRC
-	offset += 4
+	// Compute total size of the byte array
+	totalSize := KEY_START + keySize + valueSize
 
-	binary.LittleEndian.PutUint64(bytesArray[offset:], uint64(keySize))
-	offset += 8
-	binary.LittleEndian.PutUint64(bytesArray[offset:], uint64(valueSize))
-	offset += 8
+	bytesArray := make([]byte, totalSize)	
+	// Placeholder for CRC - computed later
+	binary.LittleEndian.PutUint32(bytesArray[CRC_START:], 0)
 
-	// Write Key and Value
-	copy(bytesArray[offset:], r.Key)
-	offset += keySize
-	copy(bytesArray[offset:], r.Value)
-	offset += valueSize
+	// Serialize Timestamp
+	binary.LittleEndian.PutUint64(bytesArray[TIMESTAMP_START:], uint64(r.Timestamp))
 
+	// Serialize Tombstone
 	if r.Tombstone {
-		bytesArray[offset] = 1
+		bytesArray[TOMBSTONE_START] = 1
 	} else {
-		bytesArray[offset] = 0
+		bytesArray[TOMBSTONE_START] = 0
 	}
-	offset++
 
-	copy(bytesArray[offset:], []byte(r.Timestamp))
+	// Serialize KeySize and ValueSize
+	binary.LittleEndian.PutUint64(bytesArray[KEY_SIZE_START:], uint64(keySize))
+	binary.LittleEndian.PutUint64(bytesArray[VALUE_SIZE_START:], uint64(valueSize))
 
-	crc := CRC32(bytesArray[4:])
+	// Serialize Key and Value
+	copy(bytesArray[KEY_START:], r.Key)
+	copy(bytesArray[KEY_START+keySize:], r.Value)
+
+	// Compute CRC
+	crc := CRC32(bytesArray[CRC_SIZE:])
 	r.Crc = crc
-	binary.LittleEndian.PutUint32(bytesArray[0:], crc)
+	binary.LittleEndian.PutUint32(bytesArray[CRC_START:], crc)
 
 	return bytesArray, nil
 }
 
-func FromBytes(data []byte) (*Record, error) {
-	offset := 0
-
-	crc := binary.LittleEndian.Uint32(data[offset:])
-	offset += 4
-
-	if offset+8 > len(data) {
-		return nil, fmt.Errorf("insufficient data for keySize")
+func checkOffset(offset, size, totalSize int, fieldName string) error {
+	if offset+size > totalSize {
+		return fmt.Errorf("insufficient data for %s: need %d bytes, but only %d bytes available", fieldName, size, totalSize-offset)
 	}
-	keySize := binary.LittleEndian.Uint64(data[offset:])
-	offset += 8
+	return nil
+}
 
-	if offset+8 > len(data) {
-		return nil, fmt.Errorf("insufficient data for valueSize")
+func FromBytes(data []byte) (*Record, error) {	
+	// Deserialize CRC
+	if err := checkOffset(CRC_START, CRC_SIZE, len(data), "CRC"); err != nil {
+		return nil, err
 	}
-	valueSize := binary.LittleEndian.Uint64(data[offset:])
-	offset += 8
+	crc := binary.LittleEndian.Uint32(data[CRC_START:])
 
-	if offset+int(keySize) > len(data) {
-		return nil, fmt.Errorf("insufficient data for key")
+	// Deserialize Timestamp
+	if err := checkOffset(TIMESTAMP_START, TIMESTAMP_SIZE, len(data), "TIMESTAMP"); err != nil {
+		return nil, err
 	}
-	key := string(data[offset : offset + int(keySize)])
-	offset += int(keySize)
+	timestamp := int64(binary.LittleEndian.Uint64(data[TIMESTAMP_START:]))
 
-	if offset+int(valueSize) > len(data) {
-		return nil, fmt.Errorf("insufficient data for value")
+	// Deserialize Tombstone
+	if err := checkOffset(TOMBSTONE_START, TOMBSTONE_SIZE, len(data), "TOMBSTONE"); err != nil {
+		return nil, err
 	}
-	value := data[offset : offset + int(valueSize)]
-	offset += int(valueSize)
+	tombstone := data[TOMBSTONE_START] == 1
 
-	if offset+1 > len(data) {
-		return nil, fmt.Errorf("insufficient data for tombstone")
+	// Deserialize KeySize
+	if err := checkOffset(KEY_SIZE_START, KEY_SIZE, len(data), "KEY_SIZE"); err != nil {
+		return nil, err
 	}
-	tombstone := data[offset] == 1
-	offset++
+	keySize := binary.LittleEndian.Uint64(data[KEY_SIZE_START:])
 
-	if offset > len(data) {
-		return nil, fmt.Errorf("insufficient data for timestamp")
+	// Deserialize ValueSize
+	if err := checkOffset(VALUE_SIZE_START, VALUE_SIZE, len(data), "VALUE_SIZE"); err != nil {
+		return nil, err
 	}
-	timestamp := string(data[offset:])
+	valueSize := binary.LittleEndian.Uint64(data[VALUE_SIZE_START:])
+
+	// Deserialize Key
+	keyStart := KEY_START
+	if err := checkOffset(keyStart, int(keySize), len(data), "KEY"); err != nil {
+		return nil, err
+	}
+	key := string(data[keyStart : keyStart + int(keySize)])
+
+	// Deserialize Value
+	valueStart := KEY_START + int(keySize)
+	if err := checkOffset(valueStart, int(valueSize), len(data), "VALUE"); err != nil {
+		return nil, err
+	}
+	value := data[valueStart : valueStart + int(valueSize)]
 	
-	calculatedCrc := CRC32(data[4:])
+	// Compare old and new CRC
+	calculatedCrc := CRC32(data[CRC_SIZE:])
 	if crc != calculatedCrc {
 		return nil, fmt.Errorf("crc mismatch: expected %d, got %d", crc, calculatedCrc)
 	}
 	
 	return &Record{
 		Crc: crc,
+		Timestamp: timestamp,
+		Tombstone: tombstone,
 		KeySize: keySize,
 		ValueSize: valueSize,
 		Key: key,
 		Value: value,
-		Tombstone: tombstone,
-		Timestamp: timestamp,
 	}, nil
 }
