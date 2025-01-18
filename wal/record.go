@@ -11,25 +11,28 @@ const (
 	CRC_SIZE = 4
 	TIMESTAMP_SIZE = 8
 	TOMBSTONE_SIZE = 1
+	TYPE_SIZE = 1
 	KEY_SIZE = 8
 	VALUE_SIZE = 8
 
 	CRC_START = 0
 	TIMESTAMP_START = CRC_START + CRC_SIZE
 	TOMBSTONE_START = TIMESTAMP_START + TIMESTAMP_SIZE
-	KEY_SIZE_START = TOMBSTONE_START + TOMBSTONE_SIZE
+	TYPE_START = TOMBSTONE_START + TOMBSTONE_SIZE
+	KEY_SIZE_START = TYPE_START + TYPE_SIZE
 	VALUE_SIZE_START = KEY_SIZE_START + KEY_SIZE
 	KEY_START = VALUE_SIZE_START + VALUE_SIZE
 )
 
 /*
-   +---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
-   |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
-   +---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
+   +---------------+-----------------+---------------+------+---------------+----------+-------+-...-+--...--+
+   |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Type | Key Size (8B) | Value Size (8B) | Key | Value |
+   +---------------+-----------------+---------------+------+---------------+----------+-------+-...-+--...--+
    CRC = 32bit hash computed over the payload using CRC
    Key Size = Length of the Key data
    Tombstone = If this record was deleted and has a value
    Value Size = Length of the Value data
+	 Type = a - ALL, f - FIRST, m - MIDDLE, l - LAST, 
    Key = Key data
    Value = Value data
    Timestamp = Timestamp of the operation in seconds
@@ -39,6 +42,7 @@ type Record struct {
 	Crc       uint32
 	Timestamp int64 
 	Tombstone bool
+	Type 			byte
 	KeySize   uint64
 	ValueSize uint64
 	Key       string
@@ -51,6 +55,7 @@ func NewRecord(key string, value []byte) *Record {
 		Crc: 0, // computed during serialization
 		Timestamp: timestamp,
 		Tombstone: false, // default value
+		Type: 'a',	// default value - ALL
 		KeySize: uint64(len(key)),
 		ValueSize: uint64(len(value)),
 		Key: key,
@@ -83,6 +88,9 @@ func (r *Record) ToBytes() ([]byte, error) {
 		bytesArray[TOMBSTONE_START] = 0
 	}
 
+	// Serialize Type
+	bytesArray[TYPE_START] = r.Type
+
 	// Serialize KeySize and ValueSize
 	binary.LittleEndian.PutUint64(bytesArray[KEY_SIZE_START:], uint64(keySize))
 	binary.LittleEndian.PutUint64(bytesArray[VALUE_SIZE_START:], uint64(valueSize))
@@ -106,6 +114,10 @@ func checkOffset(offset, size, totalSize int, fieldName string) error {
 	return nil
 }
 
+func IsValidType(t byte) bool {
+	return t == 'a' || t == 'f' || t == 'm' || t == 'l'
+}
+
 func FromBytes(data []byte) (*Record, error) {	
 	// Deserialize CRC
 	if err := checkOffset(CRC_START, CRC_SIZE, len(data), "CRC"); err != nil {
@@ -124,6 +136,15 @@ func FromBytes(data []byte) (*Record, error) {
 		return nil, err
 	}
 	tombstone := data[TOMBSTONE_START] == 1
+
+	// Deserialize Type
+	if err := checkOffset(TYPE_START, TYPE_SIZE, len(data), "TYPE"); err != nil {
+		return nil, err
+	}
+	typeField := data[TYPE_START]
+	if !IsValidType(typeField) {
+		return nil, fmt.Errorf("invalid type: %c", typeField)
+	}
 
 	// Deserialize KeySize
 	if err := checkOffset(KEY_SIZE_START, KEY_SIZE, len(data), "KEY_SIZE"); err != nil {
@@ -161,9 +182,14 @@ func FromBytes(data []byte) (*Record, error) {
 		Crc: crc,
 		Timestamp: timestamp,
 		Tombstone: tombstone,
+		Type: typeField,
 		KeySize: keySize,
 		ValueSize: valueSize,
 		Key: key,
 		Value: value,
 	}, nil
+}
+
+func CalculateRecordSize(record *Record) int {
+	return KEY_START + len(record.Key) + len(record.Value)
 }

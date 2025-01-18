@@ -6,6 +6,7 @@ import (
 )
 
 func main() {
+	fmt.Print("\n------------------record.go tests------------------\n")
 	record := wal.NewRecord("key1", []byte("value1"))
 	// Serializing the record
 	data, err := record.ToBytes()
@@ -25,4 +26,24 @@ func main() {
 	fmt.Printf("Original CRC: %d, Calculated CRC: %d\n", record.Crc, newRecord.Crc)
 	fmt.Printf("Original Record: %+v\n", record)
 	fmt.Printf("Deserialized Record: %+v", newRecord)
+
+
+	fmt.Print("\n\n------------------block.go tests------------------\n")
+
+	blockManager := wal.NewBlockManager()
+
+	records := []*wal.Record{
+		wal.NewRecord("key1", []byte("Ivana")),
+		wal.NewRecord("key2", []byte("Andjela")),
+		wal.NewRecord("key3", []byte("Elena")),
+		wal.NewRecord("key4", []byte("Aleksandar")),
+		wal.NewRecord("key5", []byte("Tijana")),
+		wal.NewRecord("key5", []byte("Milan")),
+	}
+
+	for i:=0; i<len(records); i++ {
+		blockManager.AddRecordToBlock(records[i])
+	}
+
+	blockManager.PrintBlocks()
 }
