@@ -42,7 +42,7 @@ type Record struct {
 	Crc       uint32
 	Timestamp int64 
 	Tombstone bool
-	Type byte
+	Type 			byte
 	KeySize   uint64
 	ValueSize uint64
 	Key       string
