@@ -31,64 +31,75 @@ func NewBlockManager() *BlockManager {
 	}
 }
 
-// Before adding a new Record to the Block, it have to be decided which operation should work: PADDING - p or FRAGMENTATION - f, nothing mentioned - n which means record fits just fine
+// before adding a new Record to the Block, it have to be decided which operation should be performed
 func ChosenOperation(currentBlock *Block, record *Record) byte {
 	remainingBlockCapacity := currentBlock.FullCapacity - currentBlock.CurrentCapacity
-
 	recordFullSize := CalculateRecordSize(record)
-	recordValueSize := record.ValueSize
-	remainingRecordSize := recordFullSize - int(recordValueSize)
 
 	if remainingBlockCapacity == uint64(recordFullSize) {
+		// a Record fits in the Block
 		return 'n'
-	} else if remainingBlockCapacity < uint64(recordFullSize) {
-		// This means that CRC, Timestamp, Tombstone, Type, KeySize, ValueSize, Key and some part of the Value can fit in the Block
-		if remainingBlockCapacity > uint64(remainingRecordSize) {
+	} else if remainingBlockCapacity > uint64(recordFullSize) {
+		// padding
+		return 'p'
+	} else {
+		if remainingBlockCapacity > (uint64(recordFullSize) - record.ValueSize) {
+			// fragment the Record
 			return 'f'
 		} else {
-			return 'p'
+			// make a new Block and use Padding
+			return 'b'
 		}
-	// Record fits just fine
-	} else {
-		return 'p'
 	}
 }
 
 func (bm *BlockManager) AddRecordToBlock(record *Record) {
-	currentBlock := bm.Blocks[len(bm.Blocks)-1]
-	operation := ChosenOperation(currentBlock, record)
+	currentBlock := bm.Blocks[len(bm.Blocks) - 1]
+	chosenOperation := ChosenOperation(currentBlock, record)
 
-	if operation == 'n' {
-		// Racord fits just fine, save it to block
-		currentBlock.Records = append(currentBlock.Records, record)
-		currentBlock.CurrentCapacity += uint64(CalculateRecordSize(record))
-	} else if operation == 'p' {
-		// Clean all zeros from the value of the last added record and reduce the length of block
-		if len(currentBlock.Records) > 0 {
-			var zerosToDelete uint64
-			lastAddedRecord := currentBlock.Records[len(currentBlock.Records) - 1]
-			lastAddedRecord.Value, zerosToDelete = TrimZeros(lastAddedRecord.Value)
-			lastAddedRecord.ValueSize = uint64(len(lastAddedRecord.Value))
-			currentBlock.CurrentCapacity = currentBlock.CurrentCapacity - zerosToDelete
-		}
-		// Append zeros to the Value of the Record, and save that record to block
-		remainingBlockCapacity := currentBlock.FullCapacity - currentBlock.CurrentCapacity
-		numOfZeros := remainingBlockCapacity - uint64(CalculateRecordSize(record))
-		padding := make([]byte, numOfZeros)
-		record.Value = append(record.Value, padding...)
-		record.ValueSize = uint64(len(record.Value))
-		currentBlock.Records = append(currentBlock.Records, record)
-		currentBlock.CurrentCapacity += uint64(CalculateRecordSize(record))
+	switch(chosenOperation) {
+	case 'n':
+		SaveRecordToBlock(currentBlock, record, false)
+	case 'p':
+		HandleZeros(currentBlock, record)
+	case 'b':
+		newBlockID := currentBlock.ID + 1
+		newBlock := NewBlock(newBlockID)
+		bm.Blocks = append(bm.Blocks, newBlock)
+		HandleZeros(newBlock, record)
 	}
 }
 
-func TrimZeros(data []byte) ([]byte, uint64) {
-	var i uint64
+func SaveRecordToBlock(block *Block, record  *Record, isPadding bool) {
+	if isPadding {
+		block.Records = append(block.Records, record)
+		block.CurrentCapacity += uint64(CalculateRecordSize(record)) - uint64(len(record.Value)) + record.ValueSize
+	} else {
+		block.Records = append(block.Records, record)
+		block.CurrentCapacity += uint64(CalculateRecordSize(record))
+	}
+}
+
+func HandleZeros(block *Block, record *Record) {
+	if len(block.Records) > 0 {
+		lastAddedRecord := block.Records[len(block.Records)-1]
+		lastAddedRecord.Value = TrimZeros(lastAddedRecord.Value)
+		lastAddedRecord.ValueSize = uint64(len(lastAddedRecord.Value))
+	}
+
+	numOfZeros := block.FullCapacity - uint64(CalculateRecordSize(record)) - block.CurrentCapacity // current capacity is capacity of all records before THIS
+	if numOfZeros > 0 {
+		padding := make([]byte, numOfZeros)
+		record.Value = append(record.Value, padding...)	// zeros are not actual value so increasing ValueSize won't be done
+		SaveRecordToBlock(block, record, true)
+	}
+}
+
+func TrimZeros(data []byte) ([]byte) {
 	for len(data) > 0 && data[len(data)-1] == 0 {
-		i++
 		data = data[:len(data)-1]
 	}
-	return data, i
+	return data
 }
 
 func ReadBlockRecords(block *Block) {
@@ -100,7 +111,7 @@ func ReadBlockRecords(block *Block) {
 
 func (bm *BlockManager) PrintBlocks() {
 	for i := 0; i < len(bm.Blocks); i++ {
-		fmt.Printf("Block ID: %d, Current Capacity: %d/%d", bm.Blocks[i].ID, bm.Blocks[i].CurrentCapacity, bm.Blocks[i].FullCapacity)
+		fmt.Printf("\nBlock ID: %d, Current Capacity: %d/%d", bm.Blocks[i].ID, bm.Blocks[i].CurrentCapacity, bm.Blocks[i].FullCapacity)
 		fmt.Printf(", Records: %d\n", len(bm.Blocks[i].Records))
 		ReadBlockRecords(bm.Blocks[i])
 	}

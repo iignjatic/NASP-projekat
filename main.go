@@ -31,18 +31,32 @@ func main() {
 	fmt.Print("\n\n------------------block.go tests------------------\n")
 
 	blockManager := wal.NewBlockManager()
-
-	records := []*wal.Record{
+	n_test := []*wal.Record{
+		wal.NewRecord("key1", []byte("U sumama, drvece skripi pod tezinom snijega, a vjetar nosi miris borovine. Ptice pjevaju ujutro, dok se rosa sunca presijava na travi. Rijeke tiho teku, prelazeci kroz kamencice, a divlje zivotinje polako preplivaju prirodne staze. Planine uzdizu se u daljini.......")),
 		wal.NewRecord("key1", []byte("Ivana")),
-		wal.NewRecord("key2", []byte("Andjela")),
-		wal.NewRecord("key3", []byte("Elena")),
-		wal.NewRecord("key4", []byte("Aleksandar")),
-		wal.NewRecord("key5", []byte("Tijana")),
-		wal.NewRecord("key5", []byte("Milan")),
 	}
 
-	for i:=0; i<len(records); i++ {
-		blockManager.AddRecordToBlock(records[i])
+	// p_test := []*wal.Record{
+	// 	wal.NewRecord("key1", []byte("Ivana")),
+	// 	wal.NewRecord("key2", []byte("Andjela")),
+	// 	wal.NewRecord("key3", []byte("Elena")),
+	// 	wal.NewRecord("key4", []byte("Aleksandar")),
+	// 	wal.NewRecord("key4", []byte("Milan")),
+	// }
+
+	// b_test := []*wal.Record{
+	// 	wal.NewRecord("key1", []byte("Ivana")),
+	// 	wal.NewRecord("key2", []byte("Andjela")),
+	// 	wal.NewRecord("key3", []byte("Elena")),
+	// 	wal.NewRecord("key4", []byte("Aleksandar")),
+	// 	wal.NewRecord("key5", []byte("Tijana")),
+	// 	wal.NewRecord("key5", []byte("Sunce zalazi iza planinskog vrha.")),
+	// 	wal.NewRecord("key5", []byte("Gledao sam Hunger Games dok sam ovo radio. Zanimljivost je 70 od 100")),
+	// 	wal.NewRecord("key5", []byte("Milan")),
+	// }
+
+	for i:=0; i<len(n_test); i++ {
+		blockManager.AddRecordToBlock(n_test[i])
 	}
 
 	blockManager.PrintBlocks()
