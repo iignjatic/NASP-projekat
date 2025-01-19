@@ -35,7 +35,7 @@ const (
 	 Type = a - ALL, f - FIRST, m - MIDDLE, l - LAST, 
    Key = Key data
    Value = Value data
-   Timestamp = Timestamp of the operation in seconds
+   Timestamp = Timestamp of the operation in seconds 
 */
 
 type Record struct {
