@@ -111,7 +111,7 @@ func ReadBlockRecords(block *Block) {
 
 func (bm *BlockManager) PrintBlocks() {
 	for i := 0; i < len(bm.Blocks); i++ {
-		fmt.Printf("\nBlock ID: %d, Current Capacity: %d/%d", bm.Blocks[i].ID, bm.Blocks[i].CurrentCapacity, bm.Blocks[i].FullCapacity)
+		fmt.Printf("\nBlock ID: %d, Current/Full Capacity: %d/%d", bm.Blocks[i].ID, bm.Blocks[i].CurrentCapacity, bm.Blocks[i].FullCapacity)
 		fmt.Printf(", Records: %d\n", len(bm.Blocks[i].Records))
 		ReadBlockRecords(bm.Blocks[i])
 	}
