@@ -31,10 +31,11 @@ func main() {
 	fmt.Print("\n\n------------------block.go tests------------------\n")
 
 	blockManager := wal.NewBlockManager()
-	n_test := []*wal.Record{
-		wal.NewRecord("key1", []byte("U sumama, drvece skripi pod tezinom snijega, a vjetar nosi miris borovine. Ptice pjevaju ujutro, dok se rosa sunca presijava na travi. Rijeke tiho teku, prelazeci kroz kamencice, a divlje zivotinje polako preplivaju prirodne staze. Planine uzdizu se u daljini.......")),
-		wal.NewRecord("key1", []byte("Ivana")),
-	}
+	// n_test := []*wal.Record{
+	// 	wal.NewRecord("key1", []byte("U sumama, drvece skripi pod tezinom snijega, a vjetar nosi miris borovine. Ptice pjevaju ujutro, dok se rosa sunca presijava na travi. Rijeke tiho teku, prelazeci kroz kamencice, a divlje zivotinje polako preplivaju prirodne staze. Planine uzdizu se u daljini.......")),
+	// 	wal.NewRecord("key1", []byte("Ivana")),
+	// 	wal.NewRecord("key1", []byte("Andjela")),
+	// }
 
 	// p_test := []*wal.Record{
 	// 	wal.NewRecord("key1", []byte("Ivana")),
@@ -55,8 +56,22 @@ func main() {
 	// 	wal.NewRecord("key5", []byte("Milan")),
 	// }
 
-	for i:=0; i<len(n_test); i++ {
-		blockManager.AddRecordToBlock(n_test[i])
+	f_test := []*wal.Record{
+		wal.NewRecord("key1", []byte("Ivana")),
+		wal.NewRecord("key2", []byte("Andjela")),
+		wal.NewRecord("key3", []byte("Elena")),
+		wal.NewRecord("key4", []byte("Aleksandar")),
+		wal.NewRecord("key5", []byte("-")),
+		wal.NewRecord("key5", []byte("1234567891123456789112345678911234567891123456789112345678911234567-00091123456789112345678911234567891123456789112345678911234567891123456789112345678911234567891123456781234567891123456789112345678911234567891123456789112345678911234567800091123456789112345678911211111111111111111111111111111111111111111111111111111111111111111111-0009112345678911234567891123456789112345678911234567891123456789112345678911234567891123456789112345678123456789112345678911234567891123456789112345678911234567891123456780009112345678911234567891121111111111111111111111111111111111111111111111111111111111111111111-456789112345678911234567891123456789112345678911234567891123456789112345678")),
+		wal.NewRecord("key1", []byte("Ivana")),
+		wal.NewRecord("key2", []byte("Andjela")),
+		wal.NewRecord("key3", []byte("Elena")),
+		wal.NewRecord("key4", []byte("Aleksandar")),
+		wal.NewRecord("key5", []byte("-")),
+	}
+
+	for i:=0; i<len(f_test); i++ {
+		blockManager.AddRecordToBlock(f_test[i])
 	}
 
 	blockManager.PrintBlocks()

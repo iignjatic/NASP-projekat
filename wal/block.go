@@ -59,6 +59,7 @@ func (bm *BlockManager) AddRecordToBlock(record *Record) {
 
 	switch(chosenOperation) {
 	case 'n':
+		HandleZeros(currentBlock, record)
 		SaveRecordToBlock(currentBlock, record, false)
 	case 'p':
 		HandleZeros(currentBlock, record)
@@ -67,6 +68,8 @@ func (bm *BlockManager) AddRecordToBlock(record *Record) {
 		newBlock := NewBlock(newBlockID)
 		bm.Blocks = append(bm.Blocks, newBlock)
 		HandleZeros(newBlock, record)
+	case 'f':
+		bm.FragmentRecord(currentBlock, record)
 	}
 }
 
@@ -92,6 +95,51 @@ func HandleZeros(block *Block, record *Record) {
 		padding := make([]byte, numOfZeros)
 		record.Value = append(record.Value, padding...)	// zeros are not actual value so increasing ValueSize won't be done
 		SaveRecordToBlock(block, record, true)
+	}
+}
+
+func (bm *BlockManager) FragmentRecord (block *Block, record *Record) {
+	allButValue := (uint64(CalculateRecordSize(record)) - uint64(len(record.Value)))
+	spaceFirst := block.FullCapacity - block.CurrentCapacity - allButValue
+	// FIRST
+	firstRecord := *record
+	firstRecord.Value = make([]byte, spaceFirst) 
+	copy(firstRecord.Value, record.Value[:spaceFirst])
+	firstRecord.ValueSize = spaceFirst
+	firstRecord.Type = 'f'
+	HandleZeros(block, &firstRecord)
+	SaveRecordToBlock(block, &firstRecord, false)
+	
+	remainingValue := record.Value[spaceFirst:]
+	remainingSize := uint64(len(remainingValue))
+
+	for remainingSize > 0 {
+		newBlock := NewBlock(block.ID + 1)
+		bm.Blocks = append(bm.Blocks, newBlock)
+		block = newBlock
+
+		// MIDDLE
+		spaceMiddle := block.FullCapacity-allButValue
+		if remainingSize > spaceMiddle {
+			middleRecord := *record
+			middleRecord.Value = make([]byte, spaceMiddle)
+			copy(middleRecord.Value, remainingValue[:spaceMiddle])
+			middleRecord.ValueSize = spaceMiddle
+			middleRecord.Type = 'm'
+			SaveRecordToBlock(block, &middleRecord, false)
+
+			remainingValue = remainingValue[spaceMiddle:]
+			remainingSize -= block.FullCapacity - allButValue
+		} else {
+			// LAST
+			lastRecord := *record
+			lastRecord.Value = make([]byte,remainingSize)
+			copy(lastRecord.Value, remainingValue)
+			lastRecord.ValueSize = remainingSize
+			lastRecord.Type = 'l'
+			HandleZeros(block, &lastRecord)
+			remainingSize = 0
+		}
 	}
 }
 
