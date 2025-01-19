@@ -105,7 +105,7 @@ func TrimZeros(data []byte) ([]byte) {
 func ReadBlockRecords(block *Block) {
 	records := block.Records
 	for i := 0; i < len(records); i++ {
-		fmt.Printf("Block Record %d: %v | Size: %d\n", i, records[i], CalculateRecordSize(records[i]))
+		fmt.Printf("Record %d: %v | Size: %d\n", i, records[i], CalculateRecordSize(records[i]))
 	}
 }
 
