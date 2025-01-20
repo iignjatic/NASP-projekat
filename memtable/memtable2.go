@@ -1,4 +1,4 @@
-package main
+package memtable
 
 import (
 	"encoding/binary"
@@ -75,13 +75,6 @@ func (memt *Memtable) AddRecord(record Record) error {
 		return errors.New("cannot add to a read-only memtable")
 	}
 
-	/*if memt.currentSize >= memt.maxSize {
-		_, err := memt.Flush()
-		if err != nil {
-			return err
-		}
-	}*/
-
 	fmt.Printf("Dodavane recorda sa kljcucem %s\n", record.Key)
 
 	memt.data[record.Key] = &record
@@ -90,7 +83,7 @@ func (memt *Memtable) AddRecord(record Record) error {
 }
 
 // dodavanje novog para kljuc-vrijednost u memtable
-func (memt *Memtable) AddNewRecord(key string, value []byte) error {
+/*func (memt *Memtable) AddNewRecord(key string, value []byte) error {
 	if memt.readOnly {
 		return errors.New("cannot add to a read-only memtable")
 	}
@@ -106,16 +99,16 @@ func (memt *Memtable) AddNewRecord(key string, value []byte) error {
 	memt.data[key] = &record
 	memt.currentSize++
 	return nil
-}
+}*/
 
-// dobavljenje recorda prema kljucu
+// dobavljenje recorda prema kljucu iz jedne memtabele
 func (memt *Memtable) Get(key string) (*Record, error) {
 	record, exist := memt.data[key]
 	if !exist || record.Tombstone {
 		return nil, errors.New("key not found")
 	}
 
-	fmt.Printf("Pronadjen record sa kljucem %s\n", key)
+	//fmt.Printf("Pronadjen record sa kljucem %s\n", key)
 	return record, nil
 }
 
@@ -131,7 +124,7 @@ func (memt *Memtable) Delete(key string) error {
 
 	record, exist := memt.data[key]
 	if !exist {
-		fmt.Printf("Record za kljuc %s nije pronadjen, funkcija Delete()", key)
+		//fmt.Printf("Record za kljuc %s nije pronadjen, funkcija Delete()", key)
 		return errors.New("key not found")
 	}
 
@@ -175,7 +168,7 @@ func CreateMemtableManager(maxTables, maxSize uint) *MemtableManager {
 	manager := MemtableManager{
 		tables:      make([]*Memtable, 0, maxTables),
 		maxTables:   maxTables,
-		oldestIndex: 0, ///ovdje potencijalna izmjena
+		oldestIndex: 0,
 		acitveIndex: 0,
 	}
 
@@ -187,17 +180,19 @@ func CreateMemtableManager(maxTables, maxSize uint) *MemtableManager {
 		manager.tables = append(manager.tables, memtable)
 	}
 
-	fmt.Printf("Kreiran MemtableManager sa %d tabela\n", maxTables)
+	//logovi za provjeru funkcionalnosti
+	/*fmt.Printf("Kreiran MemtableManager sa %d tabela\n", maxTables)
 	for i := 0; i < int(manager.maxTables); i++ {
 		fmt.Printf("table index %d read only %t", i, manager.tables[i].readOnly)
 	}
 	fmt.Printf("Current active index: %d", manager.acitveIndex)
 	fmt.Println()
 	fmt.Printf("Current oldest index: %d", manager.oldestIndex)
-	fmt.Println()
+	fmt.Println()*/
 	return &manager
 }
 
+// provjerava da li su sve tabele popunjene
 func (mm *MemtableManager) MemtableManagerIsFull() bool {
 	for i := 0; i < int(mm.maxTables); i++ {
 		if !mm.tables[i].IsFull() {
@@ -207,6 +202,7 @@ func (mm *MemtableManager) MemtableManagerIsFull() bool {
 	return true
 }
 
+// dodavanje novog recorda u odgovarajuci memtable
 func (mm *MemtableManager) AddRecord(record Record) error {
 	activeMemtable := mm.tables[mm.acitveIndex]
 
@@ -215,7 +211,7 @@ func (mm *MemtableManager) AddRecord(record Record) error {
 	}
 
 	if activeMemtable.IsFull() {
-		fmt.Println("Aktivna memtable je puna, rotiranje tabela")
+		//fmt.Println("Aktivna memtable je puna, rotiranje tabela")
 		if err := mm.RotateMemtables(); err != nil {
 			return fmt.Errorf("failed to rotate memtables: %w", err)
 		}
@@ -235,14 +231,18 @@ func (mm *MemtableManager) AddRecord(record Record) error {
 	return nil
 }
 
+// rotira memtabele, kada su sve popunjene "najstarija" tabela se flush-uje
+// "najstarija" tabela se oslobadja i postaje nova aktivna tabela (read-write tabela)
+// dok ona koja je bila aktivna postaje read-only
+// ako sve tabele nisu popunjene, onda samo pomjera index akitvne tabele i azurira stanje read-only polja
 func (mm *MemtableManager) RotateMemtables() error {
-	fmt.Println("Radi se RotateMemtables()")
+	//fmt.Println("Radi se RotateMemtables()")
 	if mm.MemtableManagerIsFull() {
 		oldestTable := mm.tables[mm.oldestIndex]
 		if _, err := oldestTable.Flush(); err != nil {
 			return fmt.Errorf("failed to flush table at index %d: %w", mm.oldestIndex, err)
 		}
-		fmt.Printf("Flush() tabele indeksa %d", mm.oldestIndex)
+		//fmt.Printf("Flush() tabele indeksa %d", mm.oldestIndex)
 		oldestTable.readOnly = false
 
 		//mm.acitveIndex = mm.oldestIndex
@@ -389,6 +389,7 @@ func (mm *MemtableManager) LoadFromWal(wal *Wal) error {
 	return nil
 }
 
+/*
 func main() {
 	// kreiraj menadzer sa 2 tabele kapaciteta 5
 	memtableManager := CreateMemtableManager(2, 5)
@@ -464,4 +465,4 @@ func main() {
 	} else {
 		fmt.Println("Sve tabele su uspešno flushovane!")
 	}
-}
+}*/
