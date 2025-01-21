@@ -11,23 +11,12 @@ type Block struct {
 	CurrentCapacity uint64
 }
 
-type BlockManager struct {
-	Blocks []*Block
-}
-
 func NewBlock(BlockID int) *Block {
 	return &Block{
 		ID:              BlockID,
 		Records:         []*Record{},
 		FullCapacity:    BLOCK_SIZE,
 		CurrentCapacity: 0,
-	}
-}
-
-func NewBlockManager() *BlockManager {
-	firstBlock := NewBlock(0)
-	return &BlockManager{
-		Blocks: []*Block{firstBlock},
 	}
 }
 
@@ -53,8 +42,8 @@ func ChosenOperation(currentBlock *Block, record *Record) byte {
 	}
 }
 
-func (bm *BlockManager) AddRecordToBlock(record *Record) {
-	currentBlock := bm.Blocks[len(bm.Blocks) - 1]
+func (s *Segment) AddRecordToBlock(record *Record) {
+	currentBlock := s.Blocks[len(s.Blocks) - 1]
 	chosenOperation := ChosenOperation(currentBlock, record)
 
 	switch(chosenOperation) {
@@ -66,10 +55,10 @@ func (bm *BlockManager) AddRecordToBlock(record *Record) {
 	case 'b':
 		newBlockID := currentBlock.ID + 1
 		newBlock := NewBlock(newBlockID)
-		bm.Blocks = append(bm.Blocks, newBlock)
+		s.Blocks = append(s.Blocks, newBlock)
 		HandleZeros(newBlock, record)
 	case 'f':
-		bm.FragmentRecord(currentBlock, record)
+		s.FragmentRecord(currentBlock, record)
 	}
 }
 
@@ -98,7 +87,7 @@ func HandleZeros(block *Block, record *Record) {
 	}
 }
 
-func (bm *BlockManager) FragmentRecord (block *Block, record *Record) {
+func (s *Segment) FragmentRecord (block *Block, record *Record) {
 	allButValue := (uint64(CalculateRecordSize(record)) - uint64(len(record.Value)))
 	spaceFirst := block.FullCapacity - block.CurrentCapacity - allButValue
 	// FIRST
@@ -115,7 +104,7 @@ func (bm *BlockManager) FragmentRecord (block *Block, record *Record) {
 
 	for remainingSize > 0 {
 		newBlock := NewBlock(block.ID + 1)
-		bm.Blocks = append(bm.Blocks, newBlock)
+		s.Blocks = append(s.Blocks, newBlock)
 		block = newBlock
 
 		// MIDDLE
@@ -157,10 +146,10 @@ func ReadBlockRecords(block *Block) {
 	}
 }
 
-func (bm *BlockManager) PrintBlocks() {
-	for i := 0; i < len(bm.Blocks); i++ {
-		fmt.Printf("\nBlock ID: %d, Current/Full Capacity: %d/%d", bm.Blocks[i].ID, bm.Blocks[i].CurrentCapacity, bm.Blocks[i].FullCapacity)
-		fmt.Printf(", Records: %d\n", len(bm.Blocks[i].Records))
-		ReadBlockRecords(bm.Blocks[i])
+func (s *Segment) PrintBlocks() {
+	for i := 0; i < len(s.Blocks); i++ {
+		fmt.Printf("\nBlock ID: %d, Current/Full Capacity: %d/%d", s.Blocks[i].ID, s.Blocks[i].CurrentCapacity, s.Blocks[i].FullCapacity)
+		fmt.Printf(", Records: %d\n", len(s.Blocks[i].Records))
+		ReadBlockRecords(s.Blocks[i])
 	}
 }

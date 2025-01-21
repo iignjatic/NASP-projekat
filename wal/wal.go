@@ -1,46 +1,47 @@
 package wal
 
-// type Wal struct {
-// 	Segments 			 []*Segment	// Array of Segments
-// 	Directory 		 string 		// Directory where Segments are stored
-// 	CurrentSegment *Segment		// Current active segment
-// 	SegmentSize 	 int 				// Maximum number of blocks per Segment
-// 	NextSegmentID  int				// ID of the next Segment
-// }
+import "fmt"
 
-// func NewWal(directory string, segmentSize int) *Wal {
-// 	if _, err := os.Stat(directory); os.IsNotExist(err) {
-// 		os.Mkdir(directory, os.ModePerm)
-// 	}
+const DIRECTORY_PATH = "segments"
 
-// 	segmentPath := filepath.Join(directory, fmt.Sprint("wal_segment_%d.log", 0))
-// 	initialSegment := NewSegment(0, segmentSize, segmentPath)
+type Wal struct {
+	DirectoryPath  string     // directory where Segments are stored
+	Segments       []*Segment // array of Segments that are not saved
+	CurrentSegment *Segment   // current active segment
+	SegmentPaths   []string   // list of all segment paths
+}
 
-// 	return &Wal{
-// 		Segments: 			[]*Segment{initialSegment},
-// 		Directory:  		directory,
-// 		CurrentSegment: initialSegment,
-// 		SegmentSize: 		segmentSize,
-// 		NextSegmentID: 	1,
-// 	}
-// }
+func NewWal() *Wal {
+	w := &Wal{
+		DirectoryPath:  DIRECTORY_PATH,
+		Segments:       []*Segment{},
+		CurrentSegment: nil,
+		SegmentPaths:   []string{},
+	}
+	w.AddNewSegment()
+	return w
+}
 
-// // Add Block to the WAL
-// func (w *Wal) AddBlock(block *Block) {
-// 	if w.CurrentSegment.CurrentCapacity == w.CurrentSegment.FullCapacity {
-// 		w.CurrentSegment.FlushToDisk()
-// 		segmentPath := filepath.Join(w.Directory, fmt.Sprintf("wal_segment_%d.log", w.NextSegmentID))
-// 		newSegment := NewSegment(w.NextSegmentID, w.SegmentSize, segmentPath)
-// 		w.Segments = append(w.Segments, newSegment)
-// 		w.CurrentSegment = newSegment
-// 		w.NextSegmentID++
-// 	}
-// 	w.CurrentSegment.AddBlock(block)
-// }
+func (w *Wal) AddNewSegment() {
+	newSegmentID := len(w.Segments)
+	newSegment := NewSegment(newSegmentID)
+	w.Segments = append(w.Segments, newSegment)
+	w.CurrentSegment = newSegment
+	w.SegmentPaths = append(w.SegmentPaths, newSegment.FilePath)
+	fmt.Printf("Created new Segment %s\n", newSegment.FilePath)
+}
 
-// func (w *Wal) FlushToDisk() {
-// 	fmt.Printf("Flushing all segments to disk...")
-// 	for _, segment := range w.Segments {
-// 		segment.FlushToDisk()
-// 	}
-// }
+func (w *Wal) AddRecord(record *Record) {
+	w.CurrentSegment.AddRecordToBlock(record)
+	if w.CurrentSegment.IsFull() {
+		w.FlushCurrentSegment()
+		w.AddNewSegment()
+	}
+}
+
+func (w *Wal) FlushCurrentSegment() {
+	if w.CurrentSegment != nil {
+		fmt.Printf("Flushing segment %s to disk...\n", w.CurrentSegment.FilePath)
+		w.CurrentSegment.Transferred = true
+	}
+}

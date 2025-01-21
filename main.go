@@ -6,7 +6,9 @@ import (
 )
 
 func main() {
-	fmt.Print("\n------------------record.go tests------------------\n")
+	//------------------------------------------------------record.go tests------------------------------------------------------
+	fmt.Print("--------------------------------------------------------------------------------------------------")
+	fmt.Print("--------------------------------------------------------------------------------------------------\n")
 	record := wal.NewRecord("key1", []byte("value1"))
 	// Serializing the record
 	data, err := record.ToBytes()
@@ -25,12 +27,14 @@ func main() {
 	// Output
 	fmt.Printf("Original CRC: %d, Calculated CRC: %d\n", record.Crc, newRecord.Crc)
 	fmt.Printf("Original Record: %+v\n", record)
-	fmt.Printf("Deserialized Record: %+v", newRecord)
+	fmt.Printf("Deserialized Record: %+v\n", newRecord)
 
 
-	fmt.Print("\n\n------------------block.go tests------------------\n")
-
-	blockManager := wal.NewBlockManager()
+	//------------------------------------------------------block.go tests------------------------------------------------------
+	fmt.Print("--------------------------------------------------------------------------------------------------")
+	fmt.Print("--------------------------------------------------------------------------------------------------\n")
+	fmt.Print("MESSAGES:\n")
+	w := wal.NewWal()
 	// n_test := []*wal.Record{
 	// 	wal.NewRecord("key1", []byte("U sumama, drvece skripi pod tezinom snijega, a vjetar nosi miris borovine. Ptice pjevaju ujutro, dok se rosa sunca presijava na travi. Rijeke tiho teku, prelazeci kroz kamencice, a divlje zivotinje polako preplivaju prirodne staze. Planine uzdizu se u daljini.......")),
 	// 	wal.NewRecord("key1", []byte("Ivana")),
@@ -71,8 +75,11 @@ func main() {
 	}
 
 	for i:=0; i<len(f_test); i++ {
-		blockManager.AddRecordToBlock(f_test[i])
+		w.AddRecord(f_test[i])
 	}
 
-	blockManager.PrintBlocks()
+	for i:=0; i<len(w.Segments);i++ {
+		fmt.Printf("\n----------------------Segment %d, Transferred: %v----------------------\n", w.Segments[i].ID, w.Segments[i].Transferred)
+		w.Segments[i].PrintBlocks()
+	}
 }
