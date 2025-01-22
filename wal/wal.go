@@ -32,7 +32,7 @@ func (w *Wal) AddNewSegment() {
 	w.CurrentSegment = newSegment
 	w.SegmentPaths = append(w.SegmentPaths, newSegment.FilePath)
 	fmt.Printf("Created new Segment %s\n", newSegment.FilePath)
-	w.PrintCurrentWalSegmentsID()
+	w.PrintCurrentWalSegmentsIDs()
 }
 
 func (w *Wal) AddRecord(record *Record) {
@@ -78,7 +78,7 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 // 	return append(w.Segments[:ID], w.Segments[ID+1:]...)
 // }
 
-func (w *Wal) PrintCurrentWalSegmentsID() {
+func (w *Wal) PrintCurrentWalSegmentsIDs() {
 	fmt.Print("Current Wal Segment IDs: ")
 	for i:=0;i<len(w.Segments);i++ { 
 		fmt.Printf("%d ", w.Segments[i].ID)
