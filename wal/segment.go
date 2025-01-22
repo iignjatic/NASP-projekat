@@ -22,7 +22,7 @@ func NewSegment(id int) *Segment {
 		FullCapacity: SEGMENT_SIZE,
 		Transferred:  false,
 	}
-	segment.FilePath = fmt.Sprintf("wal_%d", segment.ID)
+	segment.FilePath = fmt.Sprintf("wal_%d.bin", segment.ID)
 	return segment
 }
 
