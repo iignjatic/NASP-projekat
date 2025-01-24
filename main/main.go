@@ -1,6 +1,7 @@
 package main
 
 import (
+	"NASP-PROJEKAT/SSTable"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -59,6 +60,22 @@ func main() {
 
 	*/
 
+	dataSeg := &SSTable.DataSegment{}
+	index := &SSTable.Index{}
+	summary := &SSTable.Summary{}
+	blockManager := &SSTable.BlockManager{}
+
+	// Kreiranje SSTable-a
+	sst := &SSTable.SSTable{
+		DataSegment:     dataSeg,
+		Index:           index,
+		Summary:         summary,
+		BlockManager:    blockManager,
+		DataFilePath:    "../SSTable/files/data.bin",
+		IndexFilePath:   "../SSTable/files/index.bin",
+		SummaryFilePath: "../SSTable/files/summary.bin",
+	}
+
 	var input uint32
 	var key string
 	var value []byte
@@ -102,10 +119,15 @@ func main() {
 
 				writeToMEM
 
-				if mem is full
-					writeSSTable
-
+				if mem is full{
 			*/
+			//	sst.MakeSSTable(records)
+
+			sst.Index = index
+			sst.Summary = summary
+
+			sst.WriteSSTable()
+			//}
 
 		} else if input == 3 {
 
