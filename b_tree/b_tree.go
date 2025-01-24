@@ -1,4 +1,4 @@
-package btree
+package main
 
 import (
 	"errors"
@@ -6,167 +6,315 @@ import (
 	"time"
 )
 
-type Record struct {
-	key       string
-	value     []byte
-	tombstone bool
-	timestamp string
+// m is order of BTree
+// max m children for every node
+// min (m/2) upper children for every node
+// max m-1 keys for every node
+// min (m/2) upper - 1 keys for every node
+
+type Record2 struct {
+	Crc       uint32
+	KeySize   uint64
+	ValueSize uint64
+	Key       string
+	Value     []byte
+	Tombstone bool
+	Timestamp string
 }
 
-type BTreeNode struct {
-	keys     []string     //niz kljuceva
-	records  []*Record    //odgovarajuci record-i za kljuceve
-	children []*BTreeNode //niz djece
-	isLeaf   bool         //true ako je cvor list
-	numKeys  int          //trenutni broj kljuceva u cvoru
+type BTreeNode2 struct {
+	records     []*Record2
+	children    []*BTreeNode2
+	recordNum   int
+	childrenNum int
 }
 
-type BTree struct {
-	root *BTreeNode
-	m    int //minimalan broj kljuceva u cvoru
+type BTree2 struct {
+	root *BTreeNode2
+	m    int //order
 }
 
-func NewBTreeNode(m int, leaf bool) *BTreeNode {
-	return &BTreeNode{
-		keys:     make([]string, 0, 2*m-1),
-		records:  make([]*Record, 0, 2*m-1),
-		children: make([]*BTreeNode, 0, 2*m-1),
-		isLeaf:   leaf,
-		numKeys:  0,
+func NewBTreeNode2(order int) *BTreeNode2 {
+	return &BTreeNode2{
+		records:     make([]*Record2, 0, order-1),
+		children:    make([]*BTreeNode2, 0, order),
+		recordNum:   0,
+		childrenNum: 0,
 	}
 }
 
-func NewBTree(m int) *BTree {
-	return &BTree{
-		root: NewBTreeNode(m, true),
-		m:    m,
+func (node *BTreeNode2) isLeaf() bool {
+	return len(node.children) == 0
+}
+
+func NewBTree2(order int) *BTree2 {
+	return &BTree2{
+		root: NewBTreeNode2(order),
+		m:    order,
 	}
 }
 
-func (tree *BTree) PrintTree(node *BTreeNode, level int) {
+func (tree *BTree2) PrintTree(node *BTreeNode2, level int) {
 	if node == nil {
 		return
 	}
+	// uvalcenje za svaki nivo
+	indent := ""
+	for i := 0; i < level; i++ {
+		indent += "  "
+	}
 
-	fmt.Printf("Level %d: %d keys\n", level, len(node.keys))
-	for _, k := range node.keys {
-		fmt.Printf("%s ", k)
+	fmt.Printf("%sČvor na nivou %d:\n", indent, level)
+
+	// ispis svih records u trenutnom čvoru
+	for _, record := range node.records {
+		//fmt.Printf("%s  Record %d: Key='%s', Value='%s', Tombstone=%v, Timestamp=%s\n",
+		//	indent, i+1, record.Key, string(record.Value), record.Tombstone, record.Timestamp)
+		fmt.Printf("%s Key='%s'", indent, record.Key)
 	}
 	fmt.Println()
+	// rekurzivno ispisi djecu cvora
+	for _, child := range node.children {
+		tree.PrintTree(child, level+1)
+	}
+}
 
-	level++
-	if len(node.children) > 0 {
-		for _, c := range node.children {
-			tree.PrintTree(c, level)
+func (node *BTreeNode2) search(key string) (int, bool) {
+	low, high := 0, node.recordNum
+	var mid int
+	for low < high {
+		mid = (low + high) / 2
+		if key > node.records[mid].Key {
+			low = mid + 1
+		} else if key < node.records[mid].Key {
+			high = mid
+		} else {
+			return mid, true
 		}
 	}
+	return low, false
 }
 
-func (tree *BTree) Search(key string) (*BTreeNode, int) {
-	return tree.searchRecursive(key, tree.root)
+func (t *BTree2) Get(key string) (*Record2, error) {
+	for next := t.root; next != nil; {
+		index, found := next.search(key)
+
+		if found {
+			return next.records[index], nil
+		}
+
+		next = next.children[index]
+	}
+
+	return nil, errors.New("key not found")
 }
 
-// mozda bi trebalo vratiti record u tom nodu, ali mozda i ne treba jer imam node i koji je po redu kljuc i record jer su u istom redoslijedu
-func (tree *BTree) searchRecursive(key string, node *BTreeNode) (*BTreeNode, int) {
-	if node == nil {
-		return nil, -1
+func (tree *BTree2) Delete(key string) error {
+	record, err := tree.Get(key)
+	if err != nil {
+		return err
 	}
-
-	i := 0
-	for i < len(node.keys) && key > node.keys[i] {
-		i++
-	}
-
-	if i < len(node.keys) && key == node.keys[i] {
-		return node, i
-	}
-
-	if node.isLeaf {
-		return nil, -1
-	}
-
-	return tree.searchRecursive(key, node.children[i])
-}
-
-func (tree *BTree) Update(key string, newValue []byte) error {
-	node, index := tree.Search(key)
-	if index == -1 {
-		return errors.New("key not found")
-	}
-
-	record := node.records[index]
-	record.value = newValue
-	record.timestamp = time.Now().UTC().Format(time.RFC3339)
+	record.Tombstone = true
+	record.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	return nil
 }
 
-func (tree *BTree) Delete(key string) error {
-	node, index := tree.Search(key)
-	if index == -1 {
-		return errors.New("key not found")
+func (node *BTreeNode2) insertRecordAt(index int, record *Record2) {
+	if index < len(node.records) {
+		// kopira se na mjesta od index+1 do recordNum+1 vrijednost od index do recordNum
+		// odnosno pravi se jedno prazno mjesto ako ne dodajemo na kraj
+		node.records = append(node.records, nil)
+		copy(node.records[index+1:node.recordNum+1], node.records[index:node.recordNum])
+		node.records[index] = record
+	} else {
+		node.records = append(node.records, record)
 	}
-
-	record := node.records[index]
-	record.tombstone = true
-	record.timestamp = time.Now().UTC().Format(time.RFC3339)
-	return nil
+	node.recordNum++
 }
 
-func (tree *BTree) Insert(key string, value []byte) {
-	root := tree.root
-	if root.numKeys == 2*tree.m-1 {
-		newRoot := NewBTreeNode(tree.m, false)
-		tree.root = newRoot
-		newRoot.children = append(newRoot.children, root)
-		tree.splitChild(newRoot, 0)
-		tree.insertNonFull(newRoot, key, value)
+func (node *BTreeNode2) insertChildAt(index int, childNode *BTreeNode2) {
+	if index < len(node.children) {
+		node.children = append(node.children, nil)
+		copy(node.children[index+1:], node.children[index:])
+		node.children[index] = childNode
 	} else {
-		tree.insertNonFull(root, key, value)
+		node.children = append(node.children, childNode)
 	}
+	node.childrenNum++
 }
 
-func (tree *BTree) insertNonFull(node *BTreeNode, key string, value []byte) {
-	i := node.numKeys - 1
+func (tree *BTree2) split(node *BTreeNode2) (*Record2, *BTreeNode2) {
+	minRecords := tree.m/2 - 1
+	mid := minRecords
+	midRecord := node.records[mid]
 
-	if node.isLeaf {
-		node.keys = append(node.keys[:i+1], node.keys[i:]...)
-		node.keys[i+1] = key
-		node.records = append(node.records[:i+1], node.records[i:]...)
-		node.records[i+1] = &Record{
-			key:       key,
-			value:     value,
-			timestamp: time.Now().UTC().Format(time.RFC3339),
-			tombstone: false}
-		node.numKeys++
-	} else {
-		for i >= 0 && key < node.keys[i] {
-			i--
-		}
-		i++
-		if node.children[i].numKeys == (2*tree.m)-1 {
-			tree.splitChild(node, i)
-			if key > node.keys[i] {
-				i++
+	newNode := NewBTreeNode2(tree.m)
+	newNode.records = append(newNode.records, node.records[mid+1:]...)
+	newNode.recordNum = len(newNode.records)
+
+	if !node.isLeaf() {
+		newNode.children = append(newNode.children, node.children[mid+1:]...)
+		newNode.childrenNum = len(newNode.children)
+	}
+
+	node.records = node.records[:mid]
+	node.recordNum = len(node.records)
+
+	if !node.isLeaf() {
+		node.children = node.children[:mid+1]
+		node.childrenNum = len(node.children)
+	}
+
+	return midRecord, newNode
+}
+
+func (tree *BTree2) rotate(node *BTreeNode2, index int) bool {
+	// provjerava da li postoji lijevi sibling
+	/*if index > 0 {
+			leftSibling := node.children[index-1]
+			if len(leftSibling.records) < tree.m - 1 {
+				leftSibling.insertRecordAt(len(leftSibling.records), node.records[index-1])
+				if !node.isLeaf() {
+					leftSibling.insertChildAt(len(leftSibling.children), node.children[index].children[0])
+					node.children[index].children = node.children[index].children[1:]
+					node.children[index].childrenNum--
+				}
+				// prebaci kljuc iz trenutnog cvora u roditelja
+				node.records[index-1] = node.children[index].records[0]
+				node.children[index].records = node.children[index].records[1:]
+				node.children[index].recordNum--
+				return true
 			}
 		}
-		tree.insertNonFull(node.children[i], key, value)
-	}
+
+		//provjerava da li postoji desni sibling
+		if index < len(node.children) - 1 {
+			rightSibling := node.children[index+1]
+	        if len(rightSibling.records) < tree.m-1 {
+	            // rotiraj iz roditelja u desni sibling
+	            rightSibling.insertRecordAt(0, node.records[index])
+	            if !node.isLeaf() {
+	                rightSibling.insertChildAt(0, node.children[index].children[len(node.children[index].children)-1])
+	                node.children[index].children = node.children[index].children[:len(node.children[index].children)-1]
+	                node.children[index].childrenNum--
+	            }
+	            // prebaci kljuc iz trenutnog cvora u roditelja
+	            node.records[index] = node.children[index].records[len(node.children[index].records)-1]
+	            node.children[index].records = node.children[index].records[:len(node.children[index].records)-1]
+	            node.children[index].recordNum--
+	            return true
+	        }
+		}*/
+	return false
 }
 
-func (tree *BTree) splitChild(node *BTreeNode, index int) {
-	t := tree.m
-	child := node.children[index]
-	newChild := NewBTreeNode(t, child.isLeaf)
-	newChild.numKeys = t - 1
-
-	newChild.keys = append(newChild.keys, child.keys[t:]...)
-	child.keys = child.keys[:t-1]
-	if !child.isLeaf {
-		newChild.children = append(newChild.children, child.children[t:]...)
-		child.children = child.children[:t]
+func (tree *BTree2) insert(node *BTreeNode2, record *Record2) bool {
+	index, found := node.search(record.Key)
+	var inserted bool
+	if found {
+		node.records[index] = record
+		return false
 	}
 
-	node.children = append(node.children[:index+1], append([]*BTreeNode{newChild}, node.children[index+1:]...)...)
-	node.keys = append(node.keys[:index], append([]string{child.keys[t-1]}, node.keys[index:]...)...)
-	node.numKeys++
+	if node.isLeaf() {
+		node.insertRecordAt(index, record)
+		inserted = true
+	} else {
+		inserted = tree.insert(node.children[index], record)
+
+		if len(node.children[index].records) > tree.m-1 {
+			if !tree.rotate(node, index) {
+				midRecord, newNode := tree.split(node.children[index])
+				node.insertRecordAt(index, midRecord)
+				node.insertChildAt(index+1, newNode)
+			}
+		}
+	}
+
+	if node == tree.root && len(node.records) > tree.m-1 {
+		tree.splitRoot()
+	}
+
+	return inserted
+}
+
+func (tree *BTree2) splitRoot() {
+	newRoot := NewBTreeNode2(tree.m)
+	midRecord, newNode := tree.split(tree.root)
+	newRoot.insertRecordAt(0, midRecord)
+	newRoot.insertChildAt(0, tree.root)
+	newRoot.insertChildAt(1, newNode)
+	tree.root = newRoot
+}
+
+func (tree *BTree2) Insert(key string, value []byte) {
+	record := &Record2{
+		Key:       key,
+		Value:     value,
+		KeySize:   uint64(len(key)),
+		ValueSize: uint64(len(value)),
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Tombstone: false,
+	}
+
+	if tree.root == nil {
+		tree.root = NewBTreeNode2(tree.m)
+	}
+
+	tree.insert(tree.root, record)
+}
+
+func main() {
+	// kreiramo B stablo sa redom 4
+	tree := NewBTree2(4)
+
+	// dodajemo elemente
+	tree.Insert("a", []byte("value1"))
+	tree.Insert("b", []byte("value2"))
+	tree.Insert("c", []byte("value3"))
+	tree.Insert("d", []byte("value4"))
+	tree.Insert("e", []byte("value5"))
+	tree.Insert("f", []byte("value6"))
+	tree.Insert("g", []byte("value7"))
+	tree.Insert("h", []byte("value8"))
+	tree.Insert("i", []byte("value9"))
+	tree.Insert("j", []byte("value10"))
+	tree.Insert("k", []byte("value10"))
+	tree.Insert("l", []byte("value10"))
+	tree.Insert("m", []byte("value10"))
+	tree.Insert("n", []byte("value10"))
+
+	// ispisujemo stablo
+	fmt.Println("Stablo nakon umetanja:")
+	tree.PrintTree(tree.root, 0)
+
+	// pretrazujemo kljuc
+	key := "c"
+	record, err := tree.Get(key)
+	if err == nil {
+		fmt.Printf("Pronadjen zapis: kljuc=%s, vrijednost=%s\n", record.Key, string(record.Value))
+	} else {
+		fmt.Printf("Kljuc %s nije pronadjen\n", key)
+	}
+
+	// brisemo kljuc
+	err = tree.Delete("c")
+	if err == nil {
+		fmt.Printf("kljuc %s je obiljezen kao obrisan\n", key)
+	} else {
+		fmt.Printf("greska pri brisanju kljusa %s: %v\n", key, err)
+	}
+
+	// provjerava da li je kljuc "obrisan" (logicki)
+	record, err = tree.Get("c")
+	if err == nil {
+		fmt.Printf("pronadjen zapis: kljuc=%s, vrijednost=%s, obrisan=%v\n", record.Key, string(record.Value), record.Tombstone)
+	} else {
+		fmt.Printf("Kljuc %s nije pronadjen nakon brisanja\n", key)
+	}
+
+	// ponovo ispis stabla
+	fmt.Println("Stablo nakon brisanja:")
+	tree.PrintTree(tree.root, 0)
+
 }
