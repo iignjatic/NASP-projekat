@@ -122,21 +122,23 @@ func (dataSegment *DataSegment) RecordToBytes(record *data.Record, size uint32, 
 	var key string = record.Key
 	var value []byte = record.Value
 	var tombstone bool = record.Tombstone
+	var timestamp = record.Timestamp
 
 	binary.LittleEndian.PutUint32(recordBytes[0:], crc)
 	binary.LittleEndian.PutUint32(recordBytes[4:], keySize)
 	binary.LittleEndian.PutUint32(recordBytes[8:], valueSize)
-	recordBytes = append(recordBytes, indicator)
-	copy(recordBytes[13:], []byte(key))
-	copy(recordBytes[13+keySize:], value)
+	//recordBytes = append(recordBytes, indicator)
+	copy(recordBytes[12:], []byte(key))
+	copy(recordBytes[12+keySize:], value)
 	if tombstone {
-		recordBytes[13+keySize+valueSize] = 1
+		recordBytes[12+keySize+valueSize] = 1
 	} else {
-		recordBytes[13+keySize+valueSize] = 0
+		recordBytes[12+keySize+valueSize] = 0
 	}
+	copy(recordBytes[12+keySize+valueSize+1:], []byte(timestamp))
 	return recordBytes
 }
 
 func (dataSegment *DataSegment) GetRecordSize(record *data.Record) uint32 {
-	return 3*4 + record.KeySize + record.ValueSize + 1 + 1 + 10
+	return 3*4 + record.KeySize + record.ValueSize + 1 + 10
 }

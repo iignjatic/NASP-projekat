@@ -23,7 +23,7 @@ func (index *Index) MakeIndex(records []*data.Record) {
 	// }
 }
 
-func (index *Index) recordToBytes(record *data.Record, size uint32, indicator byte, offset uint32) []byte {
+func (index *Index) recordToBytes(record *data.Record, size uint32, offset uint32) []byte {
 	recordBytes := make([]byte, size)
 	var keySize uint32 = record.KeySize
 	var key string = record.Key
@@ -36,5 +36,5 @@ func (index *Index) recordToBytes(record *data.Record, size uint32, indicator by
 }
 
 func (index *Index) getRecordSize(record *data.Record) uint32 {
-	return 2*4 + record.KeySize
+	return 2*4 + record.KeySize //key, key size i offset
 }
