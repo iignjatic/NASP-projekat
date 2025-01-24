@@ -12,7 +12,7 @@ import (
 // max m-1 keys for every node
 // min (m/2) upper - 1 keys for every node
 
-type Record2 struct {
+type Record struct {
 	Crc       uint32
 	KeySize   uint64
 	ValueSize uint64
@@ -22,39 +22,39 @@ type Record2 struct {
 	Timestamp string
 }
 
-type BTreeNode2 struct {
-	records     []*Record2
-	children    []*BTreeNode2
+type BTreeNode struct {
+	records     []*Record
+	children    []*BTreeNode
 	recordNum   int
 	childrenNum int
 }
 
-type BTree2 struct {
-	root *BTreeNode2
+type BTree struct {
+	root *BTreeNode
 	m    int //order
 }
 
-func NewBTreeNode2(order int) *BTreeNode2 {
-	return &BTreeNode2{
-		records:     make([]*Record2, 0, order-1),
-		children:    make([]*BTreeNode2, 0, order),
+func NewBTreeNode(order int) *BTreeNode {
+	return &BTreeNode{
+		records:     make([]*Record, 0, order-1),
+		children:    make([]*BTreeNode, 0, order),
 		recordNum:   0,
 		childrenNum: 0,
 	}
 }
 
-func (node *BTreeNode2) isLeaf() bool {
+func (node *BTreeNode) isLeaf() bool {
 	return len(node.children) == 0
 }
 
-func NewBTree2(order int) *BTree2 {
-	return &BTree2{
-		root: NewBTreeNode2(order),
+func NewBTree(order int) *BTree {
+	return &BTree{
+		root: NewBTreeNode(order),
 		m:    order,
 	}
 }
 
-func (tree *BTree2) PrintTree(node *BTreeNode2, level int) {
+func (tree *BTree) PrintTree(node *BTreeNode, level int) {
 	if node == nil {
 		return
 	}
@@ -79,7 +79,7 @@ func (tree *BTree2) PrintTree(node *BTreeNode2, level int) {
 	}
 }
 
-func (node *BTreeNode2) search(key string) (int, bool) {
+func (node *BTreeNode) search(key string) (int, bool) {
 	low, high := 0, node.recordNum
 	var mid int
 	for low < high {
@@ -95,7 +95,7 @@ func (node *BTreeNode2) search(key string) (int, bool) {
 	return low, false
 }
 
-func (t *BTree2) Get(key string) (*Record2, error) {
+func (t *BTree) Get(key string) (*Record, error) {
 	for next := t.root; next != nil; {
 		index, found := next.search(key)
 
@@ -109,7 +109,7 @@ func (t *BTree2) Get(key string) (*Record2, error) {
 	return nil, errors.New("key not found")
 }
 
-func (tree *BTree2) Delete(key string) error {
+func (tree *BTree) Delete(key string) error {
 	record, err := tree.Get(key)
 	if err != nil {
 		return err
@@ -119,7 +119,7 @@ func (tree *BTree2) Delete(key string) error {
 	return nil
 }
 
-func (node *BTreeNode2) insertRecordAt(index int, record *Record2) {
+func (node *BTreeNode) insertRecordAt(index int, record *Record) {
 	if index < len(node.records) {
 		// kopira se na mjesta od index+1 do recordNum+1 vrijednost od index do recordNum
 		// odnosno pravi se jedno prazno mjesto ako ne dodajemo na kraj
@@ -132,7 +132,7 @@ func (node *BTreeNode2) insertRecordAt(index int, record *Record2) {
 	node.recordNum++
 }
 
-func (node *BTreeNode2) insertChildAt(index int, childNode *BTreeNode2) {
+func (node *BTreeNode) insertChildAt(index int, childNode *BTreeNode) {
 	if index < len(node.children) {
 		node.children = append(node.children, nil)
 		copy(node.children[index+1:], node.children[index:])
@@ -143,12 +143,12 @@ func (node *BTreeNode2) insertChildAt(index int, childNode *BTreeNode2) {
 	node.childrenNum++
 }
 
-func (tree *BTree2) split(node *BTreeNode2) (*Record2, *BTreeNode2) {
+func (tree *BTree) split(node *BTreeNode) (*Record, *BTreeNode) {
 	minRecords := tree.m/2 - 1
 	mid := minRecords
 	midRecord := node.records[mid]
 
-	newNode := NewBTreeNode2(tree.m)
+	newNode := NewBTreeNode(tree.m)
 	newNode.records = append(newNode.records, node.records[mid+1:]...)
 	newNode.recordNum = len(newNode.records)
 
@@ -168,7 +168,7 @@ func (tree *BTree2) split(node *BTreeNode2) (*Record2, *BTreeNode2) {
 	return midRecord, newNode
 }
 
-func (tree *BTree2) rotate(node *BTreeNode2, index int) bool {
+func (tree *BTree) rotate(node *BTreeNode, index int) bool {
 	// provjerava da li postoji lijevi sibling
 	if index > 0 {
 		leftSibling := node.children[index-1]
@@ -208,7 +208,7 @@ func (tree *BTree2) rotate(node *BTreeNode2, index int) bool {
 	return false
 }
 
-func (tree *BTree2) insert(node *BTreeNode2, record *Record2) bool {
+func (tree *BTree) insert(node *BTreeNode, record *Record) bool {
 	index, found := node.search(record.Key)
 	var inserted bool
 	if found {
@@ -238,8 +238,8 @@ func (tree *BTree2) insert(node *BTreeNode2, record *Record2) bool {
 	return inserted
 }
 
-func (tree *BTree2) splitRoot() {
-	newRoot := NewBTreeNode2(tree.m)
+func (tree *BTree) splitRoot() {
+	newRoot := NewBTreeNode(tree.m)
 	midRecord, newNode := tree.split(tree.root)
 	newRoot.insertRecordAt(0, midRecord)
 	newRoot.insertChildAt(0, tree.root)
@@ -247,8 +247,8 @@ func (tree *BTree2) splitRoot() {
 	tree.root = newRoot
 }
 
-func (tree *BTree2) Insert(key string, value []byte) {
-	record := &Record2{
+func (tree *BTree) Insert(key string, value []byte) {
+	record := &Record{
 		Key:       key,
 		Value:     value,
 		KeySize:   uint64(len(key)),
@@ -258,7 +258,7 @@ func (tree *BTree2) Insert(key string, value []byte) {
 	}
 
 	if tree.root == nil {
-		tree.root = NewBTreeNode2(tree.m)
+		tree.root = NewBTreeNode(tree.m)
 	}
 
 	tree.insert(tree.root, record)
@@ -266,7 +266,7 @@ func (tree *BTree2) Insert(key string, value []byte) {
 
 func main() {
 	// kreiramo B stablo sa redom 4
-	tree := NewBTree2(4)
+	tree := NewBTree(4)
 
 	// dodajemo elemente
 	//tree.Insert("a", []byte("value1"))
