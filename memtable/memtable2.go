@@ -1,10 +1,8 @@
 package memtable
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"hash/crc32"
 	"sort"
 	"time"
 )
@@ -180,7 +178,7 @@ func CreateMemtableManager(maxTables, maxSize uint) *MemtableManager {
 		manager.tables = append(manager.tables, memtable)
 	}
 
-	//logovi za provjeru funkcionalnosti
+	//ispisi za provjeru funkcionalnosti
 	/*fmt.Printf("Kreiran MemtableManager sa %d tabela\n", maxTables)
 	for i := 0; i < int(manager.maxTables); i++ {
 		fmt.Printf("table index %d read only %t", i, manager.tables[i].readOnly)
@@ -299,12 +297,12 @@ func (mm *MemtableManager) FlushAll() error {
 }
 
 // funkcija iz record.go u wal strukturi koja jos nije dostupa na develop grani
-func CRC32(data []byte) uint32 {
+/*func CRC32(data []byte) uint32 {
 	return crc32.ChecksumIEEE(data)
-}
+}*/
 
 // funkcija iz record.go u wal strukturi koja jos nije dostupna na develop grani
-func FromBytes(data []byte) (*Record, error) {
+/*func FromBytes(data []byte) (*Record, error) {
 	offset := 0
 
 	crc := binary.LittleEndian.Uint32(data[offset:])
@@ -359,9 +357,15 @@ func FromBytes(data []byte) (*Record, error) {
 		Tombstone: tombstone,
 		Timestamp: timestamp,
 	}, nil
+}*/
+
+func (mm *MemtableManager) LoadFromWal(records []Record) {
+	for _, rec := range records {
+		mm.AddRecord(rec)
+	}
 }
 
-func (mm *MemtableManager) LoadFromWal(wal *Wal) error {
+/*func (mm *MemtableManager) LoadFromWal(wal *Wal) error {
 	for _, segment := range wal.Segments {
 		for _, block := range segment.Blocks {
 			offset := 0
@@ -387,7 +391,7 @@ func (mm *MemtableManager) LoadFromWal(wal *Wal) error {
 		}
 	}
 	return nil
-}
+}*/
 
 /*
 func main() {
