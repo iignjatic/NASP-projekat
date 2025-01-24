@@ -1,8 +1,54 @@
 package main
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+type Config struct {
+	BlockSize     int `json:"BlockSize"`
+	MemTableSize  int `json:"MemTableSize"`
+	CacheSize     int `json:"CacheSize"`
+	SummarySample int `json:"SummarySample"`
+}
 
 func main() {
+	//DEFAULT VRIJEDNOSTI KONFIGURACIJE
+	var BLOCK_SIZE uint32 = 16
+	var MEMTABLE_SIZE uint32 = 30
+	var CACHE_SIZE uint32 = 10
+	var SUMMARY_SAMPLE uint32 = 5
+
+	configFile, err := os.Open("../config.json")
+	if err != nil {
+		log.Fatalf("Failed to open JSON file: %v", err)
+	}
+	defer configFile.Close()
+
+	configBytes, err := ioutil.ReadAll(configFile)
+	if err != nil {
+		log.Fatalf("Failed to open JSON file: %v", err)
+	}
+
+	var config Config
+	err = json.Unmarshal(configBytes, &config)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal JSON: %v", err)
+	} else {
+		BLOCK_SIZE = uint32(config.BlockSize)
+		MEMTABLE_SIZE = uint32(config.MemTableSize)
+		CACHE_SIZE = uint32(config.CacheSize)
+		SUMMARY_SAMPLE = uint32(config.SummarySample)
+	}
+
+	//PRISTUPANJE KONFIGURACIONIM ATRIBUTIMA
+	//config.BlockSize
+	//config.MemTableSize
+	//config.CacheSize ...
+
 	/* FORMIRANJE STRUKTURA */
 
 	/*
@@ -38,6 +84,7 @@ func main() {
 				continue
 
 			else if SEARCHSSTABLE != nil
+				UPDATE CACHE
 				found key
 
 			else
@@ -66,7 +113,7 @@ func main() {
 			fmt.Scan(&key)
 
 			/*
-				updateWAL
+				writeToWAL
 
 				updateMEM
 
