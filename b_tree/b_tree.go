@@ -170,41 +170,41 @@ func (tree *BTree2) split(node *BTreeNode2) (*Record2, *BTreeNode2) {
 
 func (tree *BTree2) rotate(node *BTreeNode2, index int) bool {
 	// provjerava da li postoji lijevi sibling
-	/*if index > 0 {
-			leftSibling := node.children[index-1]
-			if len(leftSibling.records) < tree.m - 1 {
-				leftSibling.insertRecordAt(len(leftSibling.records), node.records[index-1])
-				if !node.isLeaf() {
-					leftSibling.insertChildAt(len(leftSibling.children), node.children[index].children[0])
-					node.children[index].children = node.children[index].children[1:]
-					node.children[index].childrenNum--
-				}
-				// prebaci kljuc iz trenutnog cvora u roditelja
-				node.records[index-1] = node.children[index].records[0]
-				node.children[index].records = node.children[index].records[1:]
-				node.children[index].recordNum--
-				return true
+	if index > 0 {
+		leftSibling := node.children[index-1]
+		if len(leftSibling.records) < tree.m-1 {
+			leftSibling.insertRecordAt(len(leftSibling.records), node.records[index-1])
+			if !node.isLeaf() && len(node.children[index].children) > 0 {
+				leftSibling.insertChildAt(len(leftSibling.children), node.children[index].children[0])
+				node.children[index].children = node.children[index].children[1:]
+				node.children[index].childrenNum--
 			}
+			// prebaci kljuc iz trenutnog cvora u roditelja
+			node.records[index-1] = node.children[index].records[0]
+			node.children[index].records = node.children[index].records[1:]
+			node.children[index].recordNum--
+			return true
 		}
+	}
 
-		//provjerava da li postoji desni sibling
-		if index < len(node.children) - 1 {
-			rightSibling := node.children[index+1]
-	        if len(rightSibling.records) < tree.m-1 {
-	            // rotiraj iz roditelja u desni sibling
-	            rightSibling.insertRecordAt(0, node.records[index])
-	            if !node.isLeaf() {
-	                rightSibling.insertChildAt(0, node.children[index].children[len(node.children[index].children)-1])
-	                node.children[index].children = node.children[index].children[:len(node.children[index].children)-1]
-	                node.children[index].childrenNum--
-	            }
-	            // prebaci kljuc iz trenutnog cvora u roditelja
-	            node.records[index] = node.children[index].records[len(node.children[index].records)-1]
-	            node.children[index].records = node.children[index].records[:len(node.children[index].records)-1]
-	            node.children[index].recordNum--
-	            return true
-	        }
-		}*/
+	//provjerava da li postoji desni sibling
+	if index < len(node.children)-1 {
+		rightSibling := node.children[index+1]
+		if len(rightSibling.records) < tree.m-1 {
+			// rotiraj iz roditelja u desni sibling
+			rightSibling.insertRecordAt(0, node.records[index])
+			if !node.isLeaf() && len(node.children[index].children) > 0 {
+				rightSibling.insertChildAt(0, node.children[index].children[len(node.children[index].children)-1])
+				node.children[index].children = node.children[index].children[:len(node.children[index].children)-1]
+				node.children[index].childrenNum--
+			}
+			// prebaci kljuc iz trenutnog cvora u roditelja
+			node.records[index] = node.children[index].records[len(node.children[index].records)-1]
+			node.children[index].records = node.children[index].records[:len(node.children[index].records)-1]
+			node.children[index].recordNum--
+			return true
+		}
+	}
 	return false
 }
 
@@ -269,20 +269,37 @@ func main() {
 	tree := NewBTree2(4)
 
 	// dodajemo elemente
-	tree.Insert("a", []byte("value1"))
-	tree.Insert("b", []byte("value2"))
-	tree.Insert("c", []byte("value3"))
-	tree.Insert("d", []byte("value4"))
-	tree.Insert("e", []byte("value5"))
-	tree.Insert("f", []byte("value6"))
-	tree.Insert("g", []byte("value7"))
-	tree.Insert("h", []byte("value8"))
-	tree.Insert("i", []byte("value9"))
-	tree.Insert("j", []byte("value10"))
-	tree.Insert("k", []byte("value10"))
-	tree.Insert("l", []byte("value10"))
-	tree.Insert("m", []byte("value10"))
-	tree.Insert("n", []byte("value10"))
+	//tree.Insert("a", []byte("value1"))
+	//tree.Insert("b", []byte("value2"))
+	//tree.Insert("c", []byte("value3"))
+	//tree.Insert("d", []byte("value4"))
+	//tree.Insert("e", []byte("value5"))
+	//tree.Insert("f", []byte("value6"))
+	//tree.Insert("g", []byte("value7"))
+	//tree.Insert("h", []byte("value8"))
+	//tree.Insert("i", []byte("value9"))
+	//tree.Insert("j", []byte("value10"))
+	//tree.Insert("k", []byte("value10"))
+	//tree.Insert("l", []byte("value10"))
+	//tree.Insert("m", []byte("value10"))
+	//tree.Insert("n", []byte("value10"))
+
+	tree.Insert("n", []byte("value1"))
+	tree.Insert("m", []byte("value2"))
+	tree.Insert("l", []byte("value3"))
+	tree.Insert("k", []byte("value4"))
+	tree.Insert("j", []byte("value5"))
+	tree.Insert("i", []byte("value6"))
+	tree.Insert("h", []byte("value7"))
+	tree.Insert("g", []byte("value8"))
+	tree.Insert("f", []byte("value9"))
+	tree.Insert("e", []byte("value10"))
+	tree.Insert("d", []byte("value10"))
+	tree.Insert("c", []byte("value10"))
+	tree.Insert("b", []byte("value10"))
+	tree.Insert("a", []byte("value10"))
+	tree.Insert("A", []byte("value10"))
+	tree.Insert("1", []byte("value10"))
 
 	// ispisujemo stablo
 	fmt.Println("Stablo nakon umetanja:")
