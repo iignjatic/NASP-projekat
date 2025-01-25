@@ -7,5 +7,6 @@ type Record struct {
 	Key       string
 	Value     []byte
 	Tombstone bool
-	TimeStamp string
+	Timestamp string
+	Type      byte
 }
