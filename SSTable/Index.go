@@ -6,7 +6,7 @@ import (
 )
 
 type Index struct {
-	Blocks        []*Block
+	Blocks        []*data.Block
 	SegmentSize   uint32
 	IndexFilePath string
 	//	IndexTable    map[string]uint32

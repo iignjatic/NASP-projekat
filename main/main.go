@@ -1,6 +1,7 @@
 package main
 
 import (
+	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/SSTable"
 	"encoding/json"
 	"fmt"
@@ -63,7 +64,7 @@ func main() {
 	dataSeg := &SSTable.DataSegment{}
 	index := &SSTable.Index{}
 	summary := &SSTable.Summary{}
-	blockManager := &SSTable.BlockManager{}
+	blockManager := &BlockManager.BlockManager{}
 
 	// Kreiranje SSTable-a
 	sst := &SSTable.SSTable{

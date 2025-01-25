@@ -1,9 +1,13 @@
 package SSTable
 
+import (
+	"NASP-PROJEKAT/data"
+)
+
 type Summary struct {
 	First       string //prvi kljuc u indexu
 	Last        string //poslednji kljuc u indexu
-	Blocks      []*Block
+	Blocks      []*data.Block
 	SegmentSize uint32 //broj blokova u samariju
 	Sample      uint32
 	//SummaryTable map[string]uint32

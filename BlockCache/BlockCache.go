@@ -1,7 +1,11 @@
 package BlockCache
 
+import (
+	"NASP-PROJEKAT/data"
+)
+
 type BlockNode struct {
-	Block *Block
+	Block *data.Block
 	Key   uint32 //redni broj bloka
 	Prev  *BlockNode
 	Next  *BlockNode
@@ -18,7 +22,7 @@ type BlockCache struct {
 	BlockMap map[uint32]*BlockNode
 }
 
-func (cache *BlockCache) checkCache(key uint32) *Block {
+func (cache *BlockCache) checkCache(key uint32) *data.Block {
 	_, exists := cache.BlockMap[key]
 	if exists {
 		return cache.BlockMap[key].Block
@@ -27,7 +31,7 @@ func (cache *BlockCache) checkCache(key uint32) *Block {
 	}
 }
 
-func (cache *BlockCache) addCache(key uint32, block *Block) {
+func (cache *BlockCache) addCache(key uint32, block *data.Block) {
 	node, exists := cache.BlockMap[key]
 	if exists {
 		if cache.LRUlist.Head != node {

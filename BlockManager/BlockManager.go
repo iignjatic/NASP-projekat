@@ -1,6 +1,7 @@
-package SSTable
+package BlockManager
 
 import (
+	"NASP-PROJEKAT/data"
 	"os"
 )
 
@@ -20,7 +21,7 @@ type BlockManager struct {
 // defer file.Close()
 
 // }
-func (blockManager *BlockManager) writeBlock(block *Block, filePath string, numberOfBlock uint32, BlockSize uint32) {
+func (blockManager *BlockManager) WriteBlock(block *data.Block, filePath string, numberOfBlock uint32, BlockSize uint32) {
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		panic(err)
@@ -32,7 +33,7 @@ func (blockManager *BlockManager) writeBlock(block *Block, filePath string, numb
 
 	//kopiram postojece podatke i time postizem da je ostatak bloka popunjen nulama
 	//jer pri poslednjim zapisima se desi da blok ostane nepopunjen do kraja
-	copy(blockWithPadding, block.records)
+	copy(blockWithPadding, block.Records)
 	offset := int64(numberOfBlock) * int64(BlockSize)
 	_, err = file.WriteAt(blockWithPadding, offset)
 	if err != nil {
@@ -40,15 +41,15 @@ func (blockManager *BlockManager) writeBlock(block *Block, filePath string, numb
 	}
 }
 
-func (BlockManager *BlockManager) readBlock(filePath string, numberOfBlock uint32) ([]byte, error) {
+func (BlockManager *BlockManager) ReadBlock(filePath string, numberOfBlock uint32) ([]byte, error) {
 	file, err := os.OpenFile(filePath, os.O_RDONLY, 0666)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	buffer := make([]byte, BlockSize) //u bafer ce biti ucitani podaci koje vraca funkcija
-	offset := int64(numberOfBlock) * int64(BlockSize)
+	buffer := make([]byte, data.BlockSize) //u bafer ce biti ucitani podaci koje vraca funkcija
+	offset := int64(numberOfBlock) * int64(data.BlockSize)
 	_, err = file.ReadAt(buffer, offset)
 	//readAt cita onoliko bajtova koliko moze da stane u bafer a to je velicina jednog bloka
 	//cita sa pozicije u datoteci koja je drugi parametar funkcije
