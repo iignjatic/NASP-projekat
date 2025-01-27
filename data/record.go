@@ -6,7 +6,7 @@ type Record struct {
 	ValueSize uint32
 	Key       string
 	Value     []byte
+	Type      byte
 	Tombstone bool
 	Timestamp string
-	Type      byte
 }
