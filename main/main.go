@@ -3,11 +3,13 @@ package main
 import (
 	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/SSTable"
+	"NASP-PROJEKAT/data"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -19,10 +21,10 @@ type Config struct {
 
 func main() {
 	//DEFAULT VRIJEDNOSTI KONFIGURACIJE
-	var BLOCK_SIZE uint32 = 16
-	var MEMTABLE_SIZE uint32 = 30
-	var CACHE_SIZE uint32 = 10
-	var SUMMARY_SAMPLE uint32 = 5
+	//var BLOCK_SIZE uint32 = 16
+	//var MEMTABLE_SIZE uint32 = 30
+	//var CACHE_SIZE uint32 = 10
+	//var SUMMARY_SAMPLE uint32 = 5
 
 	configFile, err := os.Open("../config.json")
 	if err != nil {
@@ -40,10 +42,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to unmarshal JSON: %v", err)
 	} else {
-		BLOCK_SIZE = uint32(config.BlockSize)
+		/*BLOCK_SIZE = uint32(config.BlockSize)
 		MEMTABLE_SIZE = uint32(config.MemTableSize)
 		CACHE_SIZE = uint32(config.CacheSize)
-		SUMMARY_SAMPLE = uint32(config.SummarySample)
+		SUMMARY_SAMPLE = uint32(config.SummarySample)*/
 	}
 
 	//PRISTUPANJE KONFIGURACIONIM ATRIBUTIMA
@@ -66,16 +68,8 @@ func main() {
 	summary := &SSTable.Summary{}
 	blockManager := &BlockManager.BlockManager{}
 
-	// Kreiranje SSTable-a
-	sst := &SSTable.SSTable{
-		DataSegment:     dataSeg,
-		Index:           index,
-		Summary:         summary,
-		BlockManager:    blockManager,
-		DataFilePath:    "../SSTable/files/data.bin",
-		IndexFilePath:   "../SSTable/files/index.bin",
-		SummaryFilePath: "../SSTable/files/summary.bin",
-	}
+	files, _ := ioutil.ReadDir("../SSTable/files")
+	numOfSSTables := len(files) / 3
 
 	var input uint32
 	var key string
@@ -89,11 +83,13 @@ func main() {
 		fmt.Println("3. DELETE [ key ]")
 
 		fmt.Scan(&input)
+		//input = 2
 
 		if input == 1 {
 			//GET operacija
 
 			fmt.Scan(&key)
+			//key = "key6"
 
 			/* if SEARCHMEMTABLE != nil
 				continue
@@ -101,15 +97,37 @@ func main() {
 			else if SEARCHCACHE != nil
 				continue
 
-			else if SEARCHSSTABLE != nil
-				UPDATE CACHE
-				found key
-
-			else
-				not found
-
-
 			*/
+			for i := numOfSSTables; i > 0; i-- { //prolazak kroz sve sstabele
+				// Kreiranje SSTable-a
+				sst := &SSTable.SSTable{
+					DataSegment:     dataSeg,
+					Index:           index,
+					Summary:         summary,
+					BlockManager:    blockManager,
+					DataFilePath:    "../SSTable/files/data" + strconv.Itoa(i) + ".bin",
+					IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(i) + ".bin",
+					SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(i) + ".bin",
+				}
+				sst.Summary.SegmentSize = 1 //OVO PODESITI DA SE CITA IZ FAJLA
+				sst.Summary.First = "key1"
+				sst.Summary.Last = "key6"
+				sst.Index.SegmentSize = 2
+				sst.DataSegment.SegmentSize = 29
+				value = sst.Get(key)
+				if value == nil {
+					continue
+				} else {
+					fmt.Println("Zapis je pronadjen : ", string(value))
+					//update CACHE!!!!!!!!!!!!!!!!!!
+					break
+				}
+
+			}
+			if value == nil {
+				fmt.Println("Zapis nije pronadjen")
+			}
+
 		} else if input == 2 {
 			//PUT OPERACIJA
 
@@ -124,11 +142,35 @@ func main() {
 			*/
 			//	sst.MakeSSTable(records)
 
+			numOfSSTables++
+			sst := &SSTable.SSTable{
+				DataSegment:     dataSeg,
+				Index:           index,
+				Summary:         summary,
+				BlockManager:    blockManager,
+				DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
+				IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
+				SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
+			}
+			records := []data.Record{
+				{Crc: 12345, KeySize: 4, ValueSize: 5, Key: "key1", Value: []byte("val1"), Tombstone: false, Timestamp: "2024-06-14"},
+				{Crc: 67890, KeySize: 4, ValueSize: 200, Key: "key2", Value: []byte("val2"), Tombstone: true, Timestamp: "2024-06-15"},
+				{Crc: 54321, KeySize: 4, ValueSize: 140, Key: "key3", Value: []byte("val3"), Tombstone: false, Timestamp: "2024-06-16"},
+				{Crc: 12345, KeySize: 4, ValueSize: 5, Key: "key4", Value: []byte("val4"), Tombstone: false, Timestamp: "2024-06-14"},
+				{Crc: 67890, KeySize: 4, ValueSize: 20, Key: "key5", Value: []byte("val5"), Tombstone: true, Timestamp: "2024-06-15"},
+				{Crc: 12345, KeySize: 4, ValueSize: 500, Key: "key6", Value: []byte("val6PERSA PERSIC"), Tombstone: false, Timestamp: "2024-06-14"},
+			}
+
+			var recordPtrs []*data.Record
+			for i := range records {
+				recordPtrs = append(recordPtrs, &records[i])
+			}
+			sst.MakeSSTable(recordPtrs)
+
 			sst.Index = index
 			sst.Summary = summary
 
 			sst.WriteSSTable()
-			//}
 
 		} else if input == 3 {
 
