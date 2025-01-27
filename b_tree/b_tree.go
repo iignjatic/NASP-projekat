@@ -43,6 +43,7 @@ func NewBTreeNode(order int) *BTreeNode {
 	}
 }
 
+// funkcija koja provjerava da li je cvor list
 func (node *BTreeNode) isLeaf() bool {
 	return len(node.children) == 0
 }
@@ -54,6 +55,7 @@ func NewBTree(order int) *BTree {
 	}
 }
 
+// funkcija koja ispisuje stablo
 func (tree *BTree) PrintTree(node *BTreeNode, level int) {
 	if node == nil {
 		return
@@ -79,6 +81,7 @@ func (tree *BTree) PrintTree(node *BTreeNode, level int) {
 	}
 }
 
+// binarna pretraga kljuca unutar jednog covora
 func (node *BTreeNode) search(key string) (int, bool) {
 	low, high := 0, node.recordNum
 	var mid int
@@ -95,6 +98,9 @@ func (node *BTreeNode) search(key string) (int, bool) {
 	return low, false
 }
 
+// pretraga koja se bazira na binarnoj pretrazi
+// ulazni parametar: kljuc koji se trazi
+// povratne vrijednosti: ako je pronasao record vraca njega i nil za gresku
 func (t *BTree) Get(key string) (*Record, error) {
 	for next := t.root; next != nil; {
 		index, found := next.search(key)
@@ -109,6 +115,7 @@ func (t *BTree) Get(key string) (*Record, error) {
 	return nil, errors.New("key not found")
 }
 
+// funkcija koja sluzi za logicko brisanje recorda na osnovu kljuca
 func (tree *BTree) Delete(key string) error {
 	record, err := tree.Get(key)
 	if err != nil {
@@ -119,6 +126,7 @@ func (tree *BTree) Delete(key string) error {
 	return nil
 }
 
+// dodaje novi record na odredjeni index u cvoru
 func (node *BTreeNode) insertRecordAt(index int, record *Record) {
 	if index < len(node.records) {
 		// kopira se na mjesta od index+1 do recordNum+1 vrijednost od index do recordNum
@@ -132,6 +140,7 @@ func (node *BTreeNode) insertRecordAt(index int, record *Record) {
 	node.recordNum++
 }
 
+// dodaje novo dijete cvoru na odredjenom index-u
 func (node *BTreeNode) insertChildAt(index int, childNode *BTreeNode) {
 	if index < len(node.children) {
 		node.children = append(node.children, nil)
@@ -143,6 +152,10 @@ func (node *BTreeNode) insertChildAt(index int, childNode *BTreeNode) {
 	node.childrenNum++
 }
 
+// funkcija koja split-uje odredjeni cvor
+// u proslijedjenom cvoru ostaju elementi od pocetka do sredine (ne ukljucujuci srednji)
+// povratne vrijednosti su: sredisnji record (koji se kasnije podize nivo iznad)
+// i novi node u kojem se nalaze record-i od sredisnjeg do kraja sa odgovarajucom djecom
 func (tree *BTree) split(node *BTreeNode) (*Record, *BTreeNode) {
 	minRecords := tree.m/2 - 1
 	mid := minRecords
@@ -168,6 +181,9 @@ func (tree *BTree) split(node *BTreeNode) (*Record, *BTreeNode) {
 	return midRecord, newNode
 }
 
+// funkcija koja provjerava da li postoji lijevi ili desni sibling koji nije popunjen
+// ako pronadje jedan od njih dodaje novi record na odgovarajucu poziciju iz roditelja
+// record iz cvora koji je bio prepun prebacuje u roditelja i azurira cvor koji je bio prepun
 func (tree *BTree) rotate(node *BTreeNode, index int) bool {
 	// provjerava da li postoji lijevi sibling
 	if index > 0 {
@@ -208,6 +224,10 @@ func (tree *BTree) rotate(node *BTreeNode, index int) bool {
 	return false
 }
 
+// pomocna funkcija za insert
+// provjerava prvo da li kljuc postoji, ako postoji samo azurira vrijedost
+// ako je cvor do kojeg smo stigli list, znaci da smo dosli do mjesta na kom treba dodati record
+// ako nije list nastavlja se pozivati rekurzivno metoda nad odgovarajucim djetetom
 func (tree *BTree) insert(node *BTreeNode, record *Record) bool {
 	index, found := node.search(record.Key)
 	var inserted bool
@@ -238,6 +258,7 @@ func (tree *BTree) insert(node *BTreeNode, record *Record) bool {
 	return inserted
 }
 
+// funkcija radi podjelu korijena stabla, kada je to potrebno i kada je korijen prepunjen
 func (tree *BTree) splitRoot() {
 	newRoot := NewBTreeNode(tree.m)
 	midRecord, newNode := tree.split(tree.root)
@@ -262,6 +283,32 @@ func (tree *BTree) Insert(key string, value []byte) {
 	}
 
 	tree.insert(tree.root, record)
+}
+
+func (tree *BTree) InsertRecord(record *Record) {
+	if tree.root == nil {
+		tree.root = NewBTreeNode(tree.m)
+	}
+
+	tree.insert(tree.root, record)
+}
+
+func (tree *BTree) InOrderTraversal(node *BTreeNode) {
+	if node == nil {
+		return
+	}
+
+	for i := 0; i < node.recordNum; i++ {
+		if i < len(node.children) {
+			tree.InOrderTraversal(node.children[i])
+		}
+
+		fmt.Printf("Key='%s', Value='%s'\n", node.records[i].Key, string(node.records[i].Value))
+	}
+
+	if len(node.children) > node.recordNum {
+		tree.InOrderTraversal(node.children[node.recordNum])
+	}
 }
 
 func main() {
@@ -334,4 +381,6 @@ func main() {
 	fmt.Println("Stablo nakon brisanja:")
 	tree.PrintTree(tree.root, 0)
 
+	fmt.Println("InOrder obilazak:")
+	tree.InOrderTraversal(tree.root)
 }
