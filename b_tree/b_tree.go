@@ -1,4 +1,4 @@
-package main
+package b_tree
 
 import (
 	"errors"
@@ -311,6 +311,7 @@ func (tree *BTree) InOrderTraversal(node *BTreeNode) {
 	}
 }
 
+/*
 func main() {
 	// kreiramo B stablo sa redom 4
 	tree := NewBTree(4)
@@ -383,4 +384,4 @@ func main() {
 
 	fmt.Println("InOrder obilazak:")
 	tree.InOrderTraversal(tree.root)
-}
+}*/
