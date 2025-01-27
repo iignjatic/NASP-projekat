@@ -5,6 +5,7 @@ import (
 	"NASP-PROJEKAT/data"
 	"encoding/binary"
 	"fmt"
+	"os"
 )
 
 type SSTable struct {
@@ -17,29 +18,53 @@ type SSTable struct {
 	SummaryFilePath string
 }
 
+func (sst *SSTable) ReadMeta() {
+	file, err := os.Open(sst.SummaryFilePath)
+	if err != nil {
+		panic(err)
+	}
+	bytes := make([]byte, 8)
+	_, err = file.Read(bytes)
+	firstKeySize := binary.LittleEndian.Uint64(bytes)
+	file.Seek(8, 0)
+	bytes = make([]byte, firstKeySize)
+	_, err = file.Read(bytes)
+	//firstKey := string(bytes)
+	file.Seek(8+int64(firstKeySize), 0)
+	bytes = make([]byte, 8)
+	_, err = file.Read(bytes)
+	lastKeySize := binary.LittleEndian.Uint64(bytes)
+	file.Seek(int64(data.KEY_SIZE+data.KEY_SIZE+firstKeySize), 0)
+	bytes = make([]byte, lastKeySize)
+	_, err = file.Read(bytes)
+	//lastKey := string(bytes)
+	sst.Summary.Meta = 2*data.KEY_SIZE + firstKeySize + lastKeySize
+
+}
+
 // vraca velicinu niza rekorda data segmenta u bajtovima
-func (sst *SSTable) getDataSize(records []*data.Record) uint32 {
-	var totalSize uint32 = 0
+func (sst *SSTable) getDataSize(records []*data.Record) uint64 {
+	var totalSize uint64 = 0
 	for i := 0; i < len(records); i++ {
 		recordSize := sst.DataSegment.GetRecordSize(records[i])
 		totalSize += recordSize
 	}
-	return uint32(totalSize)
+	return totalSize
 }
 
 // vraca velicinu niza rekorda indeksa  u bajtovima
-func (sst *SSTable) getIndexSize(records []*data.Record) uint32 {
-	var totalSize uint32 = 0
+func (sst *SSTable) getIndexSize(records []*data.Record) uint64 {
+	var totalSize uint64 = 0
 	for i := 0; i < len(records); i++ {
 		recordSize := sst.Index.getRecordSize(records[i])
 		totalSize += recordSize
 	}
-	return uint32(totalSize)
+	return totalSize
 }
 
 // vraca velicinu niza rekorda samarija  u bajtovima
-func (sst *SSTable) getSummarySize(records []*data.Record) uint32 {
-	var totalSize uint32 = 0
+func (sst *SSTable) getSummarySize(records []*data.Record) uint64 {
+	var totalSize uint64 = 0
 	var summaryCount = 0
 	for i := 0; i < len(records); i++ { //ako je npr  10 (sample) zapisa proslo tek tad azuriramo brojac
 		if summaryCount == int(sst.Summary.Sample) {
@@ -49,41 +74,60 @@ func (sst *SSTable) getSummarySize(records []*data.Record) uint32 {
 		}
 		summaryCount++
 	}
-	return uint32(totalSize)
+	return totalSize
 }
 
 func (sstable *SSTable) MakeSSTable(records []*data.Record) {
 	//blokovi za data segment
 	DataSize := sstable.getDataSize(records)                                    //ukupna velicina data dijela
-	sstable.DataSegment.Blocks = make([]*data.Block, 2*DataSize/data.BlockSize) //bilo DataSize/BlockSize*2
+	sstable.DataSegment.Blocks = make([]*data.Block, DataSize/data.BlockSize+1) //bilo DataSize/BlockSize*2
 	for i := range sstable.DataSegment.Blocks {
 		sstable.DataSegment.Blocks[i] = &data.Block{} // Inicijalizacija svakog bloka
 	}
 
 	//blokovi za indeks
 	IndexSize := sstable.getIndexSize(records)                             //ukupna velicina indeksa
-	sstable.Index.Blocks = make([]*data.Block, 2*IndexSize/data.BlockSize) //bilo IndexSize/BlockSize*2
+	sstable.Index.Blocks = make([]*data.Block, IndexSize/data.BlockSize+1) //bilo IndexSize/BlockSize*2
 	for i := range sstable.Index.Blocks {
 		sstable.Index.Blocks[i] = &data.Block{} // Inicijalizacija svakog bloka
 	}
 
 	//blokovi za summary
-	sstable.Summary.Sample = 2 //OVDJE TREBA SAMPLE !!!!!!
+	//sstable.Summary.Sample = 2 //OVDJE TREBA SAMPLE !!!!!!
 
 	SummarySize := sstable.getSummarySize(records)                             //ukupna velicina samarija
-	sstable.Summary.Blocks = make([]*data.Block, 3*SummarySize/data.BlockSize) //bilo SummarySize/BlockSize*2
+	sstable.Summary.Blocks = make([]*data.Block, SummarySize/data.BlockSize+1) //bilo SummarySize/BlockSize*2
 	for i := range sstable.Summary.Blocks {
 		sstable.Summary.Blocks[i] = &data.Block{} // Inicijalizacija svakog bloka
 	}
 
-	sstable.DataSegment.SegmentSize = uint32(len(sstable.DataSegment.Blocks))
-	sstable.Index.SegmentSize = uint32(len(sstable.Index.Blocks))
-	sstable.Summary.SegmentSize = uint32(len(sstable.Summary.Blocks))
+	sstable.DataSegment.SegmentSize = uint64(len(sstable.DataSegment.Blocks))
+	sstable.Index.SegmentSize = uint64(len(sstable.Index.Blocks))
+	sstable.Summary.SegmentSize = uint64(len(sstable.Summary.Blocks))
 
 	if len(records) > 0 {
 		sstable.Summary.First = records[0].Key
 		sstable.Summary.Last = records[len(records)-1].Key
 	}
+	firstKeySize := make([]byte, 8)
+	lastKeySize := make([]byte, 8)
+	firstKey := []byte(records[0].Key)
+	binary.LittleEndian.PutUint64(firstKeySize[0:], records[0].KeySize)
+	lastKey := []byte(records[len(records)-1].Key)
+	binary.LittleEndian.PutUint64(lastKeySize[0:], records[len(records)-1].KeySize)
+	file, err := os.OpenFile(sstable.SummaryFilePath, os.O_CREATE|os.O_WRONLY, 0666)
+
+	if err != nil {
+		panic(err)
+	}
+	var meta []byte
+	meta = append(meta, firstKeySize...)
+	meta = append(meta, firstKey...)
+	meta = append(meta, lastKeySize...)
+	meta = append(meta, lastKey...)
+	file.WriteAt(meta, 0)
+	metasize := records[0].KeySize + records[len(records)-1].KeySize + 2*data.KEY_SIZE
+	sstable.Summary.Meta = metasize
 
 	sstable.MakeBlocks('d', records)
 	sstable.MakeBlocks('i', records)
@@ -92,16 +136,17 @@ func (sstable *SSTable) MakeSSTable(records []*data.Record) {
 }
 
 func (sst *SSTable) WriteSSTable() {
-	var i uint32 = 0
+	var i uint64 = 0
 
 	for i = 0; i < sst.DataSegment.SegmentSize; i++ {
-		sst.BlockManager.WriteBlock(sst.DataSegment.Blocks[i], sst.DataFilePath, i, data.BlockSize)
+		sst.BlockManager.WriteBlock(sst.DataSegment.Blocks[i], sst.DataFilePath, i, data.BlockSize, 0)
 	}
 	for i = 0; i < sst.Index.SegmentSize; i++ {
-		sst.BlockManager.WriteBlock(sst.Index.Blocks[i], sst.IndexFilePath, i, data.BlockSize)
+		sst.BlockManager.WriteBlock(sst.Index.Blocks[i], sst.IndexFilePath, i, data.BlockSize, 0)
 	}
+
 	for i = 0; i < sst.Summary.SegmentSize; i++ {
-		sst.BlockManager.WriteBlock(sst.Summary.Blocks[i], sst.SummaryFilePath, i, data.BlockSize)
+		sst.BlockManager.WriteBlock(sst.Summary.Blocks[i], sst.SummaryFilePath, i, data.BlockSize, uint64(sst.Summary.Meta))
 	}
 
 }
@@ -109,10 +154,10 @@ func (sst *SSTable) WriteSSTable() {
 // t je tip blokova, za indeks, data ili summary
 func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 	i := 0 //rekord
-	var pos uint32
+	var pos uint64
 	var indicator byte = 'a'
-	var offsetIndex uint32 = 0
-	var offsetSummary uint32 = 0
+	var offsetIndex uint64 = 0
+	var offsetSummary uint64 = 0
 	var summaryCount int32 = -1
 	tempBlockSize := data.BlockSize
 	var recordBytes []byte
@@ -126,6 +171,7 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 		blocks = sst.Index.Blocks
 	} else {
 		blocks = sst.Summary.Blocks
+
 	}
 
 	for indexOfBlock := 0; indexOfBlock < len(blocks); indexOfBlock++ {
@@ -164,15 +210,15 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 					continue
 				}
 			}
-			if recordSize < uint32(tempBlockSize) && indicator != 'm' && indicator != 'l' { //ako moze cijeli stati odmah
+			if recordSize < tempBlockSize && indicator != 'm' && indicator != 'l' { //ako moze cijeli stati odmah
 				indicator = 'a' //all kao citav rekord je stao
 				blocks[indexOfBlock].Records = append(blocks[indexOfBlock].Records, recordBytes...)
-				tempBlockSize -= uint32(recordSize) //smanjimo velicinu bloka za velicinu unijetog rekorda
-				i += 1                              //prelazak na sledeci rekord
+				tempBlockSize -= recordSize //smanjimo velicinu bloka za velicinu unijetog rekorda
+				i += 1                      //prelazak na sledeci rekord
 				summaryIndicator = 0
 				indexIndicator = 0
 
-			} else if recordSize > uint32(tempBlockSize) && indicator != 'm' { //gigant je
+			} else if recordSize > tempBlockSize && indicator != 'm' { //gigant je
 				//if recordSize > BlockSize && tempBlockSize == BlockSize { //ako zapis ne moze stati u prazan blok
 				summaryIndicator = 1 //znak da je u sledecem bloku dio prethodnog zapisa i
 				// da se summaryCount ne treba povecati
@@ -182,7 +228,7 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 				//recordBytes := recordToBytes(records[i], recordSize, indicator)
 				blocks[indexOfBlock].Records = append(blocks[indexOfBlock].Records, recordBytes[0:tempBlockSize]...)
 				//recordSize -= uint32(tempBlockSize)
-				pos = uint32(tempBlockSize)
+				pos = tempBlockSize
 				tempBlockSize = data.BlockSize //jer je blok popunjen do kraja
 				indicator = 'm'
 				break
@@ -204,8 +250,8 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 
 			} else if indicator == 'm' { //middle gigant
 				//recordSize = recordSize - BlockSize
-				recordSize = recordSize - pos
-				if recordSize < uint32(data.BlockSize) { //ako ostatak zapisa moze stati u taj blok to je poslednji dio zapisa l''
+				recordSize = recordSize - uint64(pos)
+				if recordSize < data.BlockSize { //ako ostatak zapisa moze stati u taj blok to je poslednji dio zapisa l''
 					indicator = 'l'
 					//recordBytes := recordToBytes(records[i], recordSize, indicator)
 					blocks[indexOfBlock].Records = append(blocks[indexOfBlock].Records, recordBytes[pos:]...)
@@ -255,21 +301,22 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 	}
 }
 
-func (sst *SSTable) SearchSummary(key string) int32 {
+func (sst *SSTable) SearchSummary(key string) int64 {
 	// if key < sst.Summary.First || key > sst.Summary.Last {
 	// 	return -1
 	// }
-	var currentBlock uint32 = 0
-	var lastSmallerOffset int32 = -1
+	sst.ReadMeta()
+	var currentBlock uint64 = 0
+	var lastSmallerOffset int64 = -1
 	readIndicator := -1   //koristi se za identifikovnje da li se cita keySize(0), key(1), offset(2), pocetno stanje(-1)
 	var helpBuffer []byte //koristi se za bajtove zapisa koji se prelamaju u sledeci blok
-	var keySize uint32
+	var keySize uint64
 	totalSize := 0
 	var summaryKey string
-	var helpKeySize uint32 = 0
+	var helpKeySize uint64 = 0
 
 	for currentBlock < sst.Summary.SegmentSize { //prolazak kroz blokove
-		buffer, err := sst.BlockManager.ReadBlock(sst.SummaryFilePath, currentBlock)
+		buffer, err := sst.BlockManager.ReadBlock(sst.SummaryFilePath, currentBlock, 's', int64(sst.Summary.Meta))
 		if err != nil {
 			return -1
 		}
@@ -280,32 +327,32 @@ func (sst *SSTable) SearchSummary(key string) int32 {
 			// obrada nepotpunog zapisa iz prethodnog bloka
 			if readIndicator == 0 { //znaci da se u baferu nalazi ostatak keySize
 				// citamo keySize
-				remainingSize := 4 - len(helpBuffer) //ostatak keySize koji je u trenutnom bloku
+				remainingSize := data.KEY_SIZE - len(helpBuffer) //ostatak keySize koji je u trenutnom bloku
 				//dodam preostali dio keySize i pomjerim se u bloku
 				helpBuffer = append(helpBuffer, buffer[:remainingSize]...)
 				pos += remainingSize //sad sam na poziciji na kojoj krece key
 				//a u pomocnom baferu je cijeli keySize
-				helpKeySize = binary.LittleEndian.Uint32(helpBuffer)
+				helpKeySize = binary.LittleEndian.Uint64(helpBuffer)
 				helpBuffer = nil
 
 			} else if readIndicator == 2 { // u pomocnom baferu je ostatak offseta
-				remainingSize := 4 - len(helpBuffer) //velicina ostatka offseta
+				remainingSize := 8 - len(helpBuffer) //velicina ostatka offseta
 				helpBuffer = append(helpBuffer, buffer[:remainingSize]...)
 				pos += remainingSize
-				offset := binary.LittleEndian.Uint32(helpBuffer)
+				offset := binary.LittleEndian.Uint64(helpBuffer)
 				if summaryKey > key {
 					return lastSmallerOffset
 				} else if summaryKey == key {
-					return int32(offset)
+					return int64(offset)
 				}
-				lastSmallerOffset = int32(offset)
+				lastSmallerOffset = int64(offset)
 				helpBuffer = nil
 				readIndicator = -1 //prelazimo na sledeci zapis
 			} else if readIndicator == 1 {
-				remainingSize := int(keySize) - len(helpBuffer) //velicina ostatka kljuca
+				remainingSize := int64(keySize) - int64(len(helpBuffer)) //velicina ostatka kljuca
 				//dodam preostali dio key i pomjerim se u bloku
 				helpBuffer = append(helpBuffer, buffer[:remainingSize]...)
-				pos += remainingSize
+				pos += int(remainingSize)
 
 				summaryKey = string(helpBuffer)
 				helpBuffer = nil
@@ -314,7 +361,7 @@ func (sst *SSTable) SearchSummary(key string) int32 {
 			}
 
 			// citanje novog zapisa
-			if pos+4 > len(buffer) && readIndicator == -1 {
+			if pos+data.KEY_SIZE > (len(buffer)) && readIndicator == -1 {
 				// nemamo dovoljno za keySize
 				helpBuffer = append(helpBuffer, buffer[pos:]...)
 				readIndicator = 0 //indikator da je u pomocnom baferu keySize
@@ -324,51 +371,51 @@ func (sst *SSTable) SearchSummary(key string) int32 {
 				if helpKeySize != 0 { //ako je keySize vec procitan
 					keySize = helpKeySize
 				} else {
-					keySize = binary.LittleEndian.Uint32(buffer[pos : pos+4])
+					keySize = binary.LittleEndian.Uint64(buffer[pos : pos+data.KEY_SIZE])
 				}
 				if keySize == 0 { //VIDI JE LI NEOPHODNO
 					//prelazim u sledeci blok jer je 0 znak da je do kraja tog bloka padding
 					break
 				}
 
-				totalSize = 4 + int(keySize) + 4
-				if pos+4+int(keySize) > len(buffer) { //ako ne moze da se procita citav key
-					helpBuffer = append(helpBuffer, buffer[pos+4:]...)
+				totalSize = data.KEY_SIZE + int(keySize) + 8
+				if pos+data.KEY_SIZE+int(keySize) > (len(buffer)) { //ako ne moze da se procita citav key
+					helpBuffer = append(helpBuffer, buffer[pos+data.KEY_SIZE:]...)
 					readIndicator = 1
 					break
 				}
 				//ako key moze da se procita iz tog bloka
-				summaryKey = string(buffer[pos+4 : pos+4+int(keySize)])
-				if pos+4+int(keySize)+4 > len(buffer) { //ako ne moze da se procita citav offset
-					helpBuffer = append(helpBuffer, buffer[pos+4+int(keySize):]...)
+				summaryKey = string(buffer[pos+data.KEY_SIZE : pos+data.KEY_SIZE+int(keySize)])
+				if pos+data.KEY_SIZE+int(keySize)+8 > (len(buffer)) { //ako ne moze da se procita citav offset
+					helpBuffer = append(helpBuffer, buffer[pos+data.KEY_SIZE+int(keySize):]...)
 					readIndicator = 2
 					break
 				}
 				//ako offset moze da se procita iz tog bloka
-				offset := binary.LittleEndian.Uint32(buffer[pos+4+int(keySize) : pos+4+int(keySize)+4])
+				offset := binary.LittleEndian.Uint64(buffer[pos+data.KEY_SIZE+int(keySize) : pos+data.KEY_SIZE+int(keySize)+8])
 
 				if summaryKey > key {
 					return lastSmallerOffset
 				} else if summaryKey == key {
-					return int32(offset)
+					return int64(offset)
 				}
-				lastSmallerOffset = int32(offset)
-				pos += totalSize
+				lastSmallerOffset = int64(offset)
+				pos += int(totalSize)
 				readIndicator = -1
 
 			} else if readIndicator == 2 {
-				if pos+4 > len(buffer) {
+				if pos+8 > (len(buffer)) {
 					break
 				}
-				offset := binary.LittleEndian.Uint32(buffer[pos : pos+4])
+				offset := binary.LittleEndian.Uint64(buffer[pos : pos+8])
 
 				if summaryKey > key {
 					return lastSmallerOffset
 				} else if summaryKey == key {
-					return int32(offset)
+					return int64(offset)
 				}
-				lastSmallerOffset = int32(offset)
-				pos += 4
+				lastSmallerOffset = int64(offset)
+				pos += 8
 				readIndicator = -1
 
 			}
@@ -379,52 +426,52 @@ func (sst *SSTable) SearchSummary(key string) int32 {
 	return lastSmallerOffset
 }
 
-func (sst *SSTable) SearchIndex(key string, offset int32) int32 {
-	startBlock := offset / int32(data.BlockSize) //racunanje bloka od kog krece pretraga na osnovu offseta
+func (sst *SSTable) SearchIndex(key string, offset int64) int64 {
+	startBlock := offset / int64(data.BlockSize) //racunanje bloka od kog krece pretraga na osnovu offseta
 	// if offset%int32(BlockSize) != 0 {
 	// 	startBlock++
 	// }
 
 	currentBlock := startBlock
-	var errorOffset int32 = -1 //povratna vrijednost funkcije u slucaju da se kljuc ne nalazi u indeksu
+	var errorOffset int64 = -1 //povratna vrijednost funkcije u slucaju da se kljuc ne nalazi u indeksu
 	readIndicator := -1        //koristi se za identifikovnje da li se cita keySize(0), key(1), offset(2), pocetno stanje(-1)
 	var helpBuffer []byte      //koristi se za bajtove zapisa koji se prelamaju u sledeci blok
-	var keySize uint32
+	var keySize uint64
 	totalSize := 0
 	var summaryKey string
-	var helpKeySize uint32 = 0
+	var helpKeySize uint64 = 0
 
-	for currentBlock < int32(sst.Index.SegmentSize) { //prolazak kroz blokove indexa
-		buffer, err := sst.BlockManager.ReadBlock(sst.IndexFilePath, uint32(currentBlock))
+	for currentBlock < int64(sst.Index.SegmentSize) { //prolazak kroz blokove indexa
+		buffer, err := sst.BlockManager.ReadBlock(sst.IndexFilePath, uint64(currentBlock), 'i', 0)
 		if err != nil {
 			return -1
 		}
 		// racunamo pocetnu poziciju samo za prvi blok, za svaki sledeci pocinjemo od nulte pozicije
-		pos := int32(0)
+		pos := int64(0)
 		if currentBlock == startBlock {
-			pos = offset % int32(data.BlockSize)
+			pos = offset % int64(data.BlockSize)
 		}
 
-		for pos < int32(len(buffer)) { //prolazak kroz jedan blok
+		for pos < int64(len(buffer)) { //prolazak kroz jedan blok
 			// obrada nepotpunog zapisa iz prethodnog bloka
 			if readIndicator == 0 { //znaci da se u baferu nalazi ostatak keySize
 				// citamo keySize
-				remainingSize := 4 - len(helpBuffer) //ostatak keySize koji je u trenutnom bloku
+				remainingSize := data.KEY_SIZE - len(helpBuffer) //ostatak keySize koji je u trenutnom bloku
 				//dodam preostali dio keySize i pomjerim se u bloku
 				helpBuffer = append(helpBuffer, buffer[:remainingSize]...)
-				pos += int32(remainingSize) //sad sam na poziciji na kojoj krece key
+				pos += int64(remainingSize) //sad sam na poziciji na kojoj krece key
 				//a u pomocnom baferu je cijeli keySize
-				helpKeySize = binary.LittleEndian.Uint32(helpBuffer)
+				helpKeySize = binary.LittleEndian.Uint64(helpBuffer)
 				helpBuffer = nil
 				//readIndicator = 1 //prelazim na citanje key i offset
 				//continue
 			} else if readIndicator == 2 { // u pomocnom baferu je ostatak offseta
-				remainingSize := 4 - len(helpBuffer) //velicina ostatka offseta
+				remainingSize := 8 - len(helpBuffer) //velicina ostatka offseta
 				helpBuffer = append(helpBuffer, buffer[:remainingSize]...)
-				pos += int32(remainingSize)
-				offset := binary.LittleEndian.Uint32(helpBuffer)
+				pos += int64(remainingSize)
+				offset := binary.LittleEndian.Uint64(helpBuffer)
 				if summaryKey == key {
-					return int32(offset)
+					return int64(offset)
 				}
 				//lastSmallerOffset = int32(offset)
 				helpBuffer = nil
@@ -433,7 +480,7 @@ func (sst *SSTable) SearchIndex(key string, offset int32) int32 {
 				remainingSize := int(keySize) - len(helpBuffer) //velicina ostatka kljuca
 				//dodam preostali dio key i pomjerim se u bloku
 				helpBuffer = append(helpBuffer, buffer[:remainingSize]...)
-				pos += int32(remainingSize)
+				pos += int64(remainingSize)
 
 				summaryKey = string(helpBuffer)
 				helpBuffer = nil
@@ -443,7 +490,7 @@ func (sst *SSTable) SearchIndex(key string, offset int32) int32 {
 			}
 
 			// citanje novog zapisa
-			if pos+4 > int32(len(buffer)) && readIndicator == -1 {
+			if pos+data.KEY_SIZE > int64(len(buffer)) && readIndicator == -1 {
 				// nemamo dovoljno za keySize
 				helpBuffer = append(helpBuffer, buffer[pos:]...)
 				readIndicator = 0 //indikator da je u pomocnom baferu keySize
@@ -453,46 +500,46 @@ func (sst *SSTable) SearchIndex(key string, offset int32) int32 {
 				if helpKeySize != 0 { //ako je keySize vec procitan
 					keySize = helpKeySize
 				} else {
-					keySize = binary.LittleEndian.Uint32(buffer[pos : pos+4])
+					keySize = binary.LittleEndian.Uint64(buffer[pos : pos+data.KEY_SIZE])
 				}
 				if keySize == 0 { //VIDI JE LI NEOPHODNO
 					break
 				}
 
-				totalSize = 4 + int(keySize) + 4
-				if pos+4+int32(keySize) > int32(len(buffer)) { //ako ne moze da se procita citav key
-					helpBuffer = append(helpBuffer, buffer[pos+4:]...)
+				totalSize = data.KEY_SIZE + int(keySize) + 8
+				if pos+data.KEY_SIZE+int64(keySize) > int64(len(buffer)) { //ako ne moze da se procita citav key
+					helpBuffer = append(helpBuffer, buffer[pos+data.KEY_SIZE:]...)
 					readIndicator = 1
 					break
 				}
 				//ako key moze da se procita iz tog bloka
-				summaryKey = string(buffer[pos+4 : pos+4+int32(keySize)])
-				if pos+4+int32(keySize)+4 > int32(len(buffer)) { //ako ne moze da se procita citav offset
-					helpBuffer = append(helpBuffer, buffer[pos+4+int32(keySize):]...)
+				summaryKey = string(buffer[pos+data.KEY_SIZE : pos+data.KEY_SIZE+int64(keySize)])
+				if pos+data.KEY_SIZE+int64(keySize)+8 > int64(len(buffer)) { //ako ne moze da se procita citav offset
+					helpBuffer = append(helpBuffer, buffer[pos+data.KEY_SIZE+int64(keySize):]...)
 					readIndicator = 2
 					break
 				}
 				//ako offset moze da se procita iz tog bloka
-				offset := binary.LittleEndian.Uint32(buffer[pos+4+int32(keySize) : pos+4+int32(keySize)+4])
+				offset := binary.LittleEndian.Uint64(buffer[pos+data.KEY_SIZE+int64(keySize) : pos+data.KEY_SIZE+int64(keySize)+8])
 
 				if summaryKey == key {
-					return int32(offset)
+					return int64(offset)
 				}
 				//lastSmallerOffset = int32(offset)
-				pos += int32(totalSize)
+				pos += int64(totalSize)
 				readIndicator = -1
 
 			} else if readIndicator == 2 {
-				if pos+4 > int32(len(buffer)) {
+				if pos+8 > int64(len(buffer)) {
 					break
 				}
-				offset := binary.LittleEndian.Uint32(buffer[pos:])
+				offset := binary.LittleEndian.Uint64(buffer[pos:])
 
 				if summaryKey == key {
-					return int32(offset)
+					return int64(offset)
 				}
 				//lastSmallerOffset = int32(offset)
-				pos += 4
+				pos += 8
 				readIndicator = -1
 
 			}
@@ -503,47 +550,47 @@ func (sst *SSTable) SearchIndex(key string, offset int32) int32 {
 	return errorOffset
 }
 
-func (sst *SSTable) SearchData(key string, offset int32) []byte {
-	startBlock := offset / int32(data.BlockSize) //racunanje bloka od kog krece pretraga na osnovu offseta
+func (sst *SSTable) SearchData(key string, offset int64) []byte {
+	startBlock := offset / int64(data.BlockSize) //racunanje bloka od kog krece pretraga na osnovu offseta
 	currentBlock := startBlock
 	readIndicator := -1   //koristi se za identifikovnje da li se cita keySize(0), key(1), offset(2), pocetno stanje(-1)
 	var helpBuffer []byte //koristi se za bajtove zapisa koji se prelamaju u sledeci blok
 	var value []byte
-	var keySize uint32
-	var valueSize uint32
+	var keySize uint64
+	var valueSize uint64
 	totalSize := 0
 	var remainingSize int
 
-	var helpKeySize uint32 = 0
+	var helpKeySize uint64 = 0
 
-	for currentBlock < int32(sst.DataSegment.SegmentSize) { //prolazak kroz blokove data segmenta
-		buffer, err := sst.BlockManager.ReadBlock(sst.DataFilePath, uint32(currentBlock))
+	for currentBlock < int64(sst.DataSegment.SegmentSize) { //prolazak kroz blokove data segmenta
+		buffer, err := sst.BlockManager.ReadBlock(sst.DataFilePath, uint64(currentBlock), 'd', 0)
 		if err != nil {
 			return nil
 		}
 		// racunamo pocetnu poziciju samo za prvi blok, za svaki sledeci pocinjemo od nulte pozicije
-		pos := int32(0)
+		pos := int64(0)
 		if currentBlock == startBlock {
-			pos = offset % int32(data.BlockSize)
+			pos = offset % int64(data.BlockSize)
 		}
 
-		for pos < int32(len(buffer)) { //prolazak kroz jedan blok
+		for pos < int64(len(buffer)) { //prolazak kroz jedan blok
 			if readIndicator == 0 { //znaci da se u baferu nalazi ostatak crc
 				// citamo crc
-				remainingSize = 4 - len(helpBuffer) //ostatak crc koji je u trenutnom bloku
-				pos += int32(remainingSize)         //sad sam na poziciji na kojoj krece keySize
+				remainingSize = data.CRC_SIZE - len(helpBuffer) //ostatak crc koji je u trenutnom bloku
+				pos += int64(remainingSize)                     //sad sam na poziciji na kojoj krece keySize
 			} else if readIndicator == 3 { //znaci da se u baferu nalazi ostatak keySize
 				// citamo keySize
-				remainingSize = 4 - len(helpBuffer) //ostatak keySize koji je u trenutnom bloku
+				remainingSize = data.KEY_SIZE - len(helpBuffer) //ostatak keySize koji je u trenutnom bloku
 				//dodam preostali dio keySize i pomjerim se u bloku
 				helpBuffer = append(helpBuffer, buffer[:remainingSize]...)
-				pos += int32(remainingSize) //sad sam na poziciji na kojoj krece valueSize
+				pos += int64(remainingSize) //sad sam na poziciji na kojoj krece valueSize
 				//a u pomocnom baferu je cijeli keySize
-				helpKeySize = binary.LittleEndian.Uint32(helpBuffer)
+				helpKeySize = binary.LittleEndian.Uint64(helpBuffer)
 				helpBuffer = nil
 			} else if readIndicator == 2 { // u pomocnom baferu je ostatak value
 				remainingSize = int(valueSize) - len(helpBuffer) //velicina ostatka value
-				if remainingSize > 70 {                          //value se prelama kroz vise blokova
+				if remainingSize > int(data.BlockSize) {         //value se prelama kroz vise blokova
 					helpBuffer = append(helpBuffer, buffer[:data.BlockSize]...)
 					break
 				} else {
@@ -555,12 +602,12 @@ func (sst *SSTable) SearchData(key string, offset int32) []byte {
 				//helpBuffer = nil
 				//readIndicator = -1 //prelazimo na sledeci zapis
 			} else if readIndicator == 1 {
-				remainingSize := 4 - len(helpBuffer) //velicina ostatka valueSize
+				remainingSize := data.VALUE_SIZE - len(helpBuffer) //velicina ostatka valueSize
 				//dodam preostali dio valueSize i pomjerim se u bloku
 				helpBuffer = append(helpBuffer, buffer[:remainingSize]...)
-				pos += int32(remainingSize)
+				pos += int64(remainingSize)
 
-				valueSize = binary.LittleEndian.Uint32(helpBuffer)
+				valueSize = binary.LittleEndian.Uint64(helpBuffer)
 				helpBuffer = nil
 				readIndicator = 2 //oznaka za citanje value
 				//continue
@@ -568,13 +615,13 @@ func (sst *SSTable) SearchData(key string, offset int32) []byte {
 			}
 
 			//citanje novog zapisa
-			if pos+4 > int32(len(buffer)) && readIndicator == -1 { //ne mogu da procitam crc
-				helpBuffer = append(helpBuffer, buffer[pos:pos+4]...)
+			if pos+data.CRC_SIZE > int64(len(buffer)) && readIndicator == -1 { //ne mogu da procitam crc
+				helpBuffer = append(helpBuffer, buffer[pos:pos+data.CRC_SIZE]...)
 				readIndicator = 0 //indikator da je u pomocnom baferu crc
 				break
 			}
-			if pos+8 > int32(len(buffer)) && readIndicator == -1 { //ne mogu da procitam key size u slucaju kad je procitan crc
-				helpBuffer = append(helpBuffer, buffer[pos+4:]...)
+			if pos+data.CRC_SIZE+data.KEY_SIZE > int64(len(buffer)) && readIndicator == -1 { //ne mogu da procitam key size u slucaju kad je procitan crc
+				helpBuffer = append(helpBuffer, buffer[pos+data.CRC_SIZE:]...)
 				readIndicator = 3 //indikator da je u pomocnom baferu keySize
 				break
 			}
@@ -584,9 +631,9 @@ func (sst *SSTable) SearchData(key string, offset int32) []byte {
 					keySize = helpKeySize
 				} else {
 					if readIndicator == 0 { //ako je crc prekoracio u drugi blok
-						keySize = binary.LittleEndian.Uint32(buffer[pos : pos+4])
+						keySize = binary.LittleEndian.Uint64(buffer[pos : pos+data.CRC_SIZE])
 					} else {
-						keySize = binary.LittleEndian.Uint32(buffer[pos+4 : pos+8])
+						keySize = binary.LittleEndian.Uint64(buffer[pos+data.CRC_SIZE : pos+data.CRC_SIZE+data.KEY_SIZE])
 					}
 
 				}
@@ -594,8 +641,8 @@ func (sst *SSTable) SearchData(key string, offset int32) []byte {
 					break
 				}
 
-				if readIndicator != 3 && pos+8+4 > int32(len(buffer)) { //ako je procitan key size a value size se prelama
-					helpBuffer = append(helpBuffer, buffer[pos+8:]...)
+				if readIndicator != 3 && pos+data.CRC_SIZE+data.KEY_SIZE+data.VALUE_SIZE > int64(len(buffer)) { //ako je procitan key size a value size se prelama
+					helpBuffer = append(helpBuffer, buffer[pos+data.CRC_SIZE+data.KEY_SIZE:]...)
 					readIndicator = 1
 					break
 				}
@@ -605,42 +652,42 @@ func (sst *SSTable) SearchData(key string, offset int32) []byte {
 				//ako valueSize moze da se procita iz tog bloka
 				//summaryKey = string(buffer[pos+4 : pos+4+int32(keySize)])
 				if readIndicator == 3 {
-					valueSize = binary.LittleEndian.Uint32(buffer[pos : pos+4])
+					valueSize = binary.LittleEndian.Uint64(buffer[pos : pos+data.VALUE_SIZE])
 				} else {
-					valueSize = binary.LittleEndian.Uint32(buffer[pos+8 : pos+12])
+					valueSize = binary.LittleEndian.Uint64(buffer[pos+data.CRC_SIZE+data.KEY_SIZE : pos+data.CRC_SIZE+data.KEY_SIZE+data.VALUE_SIZE])
 				}
 				if readIndicator == 3 {
-					if pos+4+int32(keySize)+int32(valueSize) > int32(len(buffer)) { //ako ne moze da se procita citav value
-						helpBuffer = append(helpBuffer, buffer[pos+4+int32(keySize):]...) //ostatak value
+					if int64(uint64(pos)+data.VALUE_SIZE+keySize+valueSize) > int64(len(buffer)) { //ako ne moze da se procita citav value
+						helpBuffer = append(helpBuffer, buffer[pos+data.VALUE_SIZE+int64(keySize):]...) //ostatak value
 						readIndicator = 2
 						break
 					} else {
 						//ako value moze da se procita iz tog bloka
-						value = buffer[pos+4+int32(keySize) : pos+4+int32(keySize)+int32(valueSize)]
+						value = buffer[pos+data.VALUE_SIZE+int64(keySize) : pos+data.VALUE_SIZE+int64(keySize)+int64(valueSize)]
 					}
 
 				} else {
-					if pos+12+int32(keySize)+int32(valueSize) > int32(len(buffer)) { //ako ne moze da se procita citav value
-						helpBuffer = append(helpBuffer, buffer[pos+12+int32(keySize):]...) //ostatak value
+					if pos+data.CRC_SIZE+data.KEY_SIZE+data.VALUE_SIZE+int64(keySize)+int64(valueSize) > int64(len(buffer)) { //ako ne moze da se procita citav value
+						helpBuffer = append(helpBuffer, buffer[pos+data.KEY_SIZE+data.CRC_SIZE+data.VALUE_SIZE+int64(keySize):]...) //ostatak value
 						readIndicator = 2
 						break
 					} else {
-						value = buffer[pos+12+int32(keySize) : pos+12+int32(keySize)+int32(valueSize)]
+						value = buffer[pos+data.CRC_SIZE+data.KEY_SIZE+data.VALUE_SIZE+int64(keySize) : pos+data.CRC_SIZE+data.KEY_SIZE+data.VALUE_SIZE+int64(keySize)+int64(valueSize)]
 					}
 
 				}
 				if readIndicator == 3 { //za testiranje dodatno ovaj dio koda od 643-650 potencijalno nepotreban
-					totalSize = 4 + int(keySize) + int(valueSize) + 1 + 10
+					totalSize = 8 + int(keySize) + int(valueSize) + 1 + 8
 				} else {
-					totalSize = 12 + int(keySize) + int(valueSize) + 1 + 10
+					totalSize = 24 + int(keySize) + int(valueSize) + 1 + 8
 
 				}
-				pos += int32(totalSize)
+				pos += int64(totalSize)
 				readIndicator = -1
 				return value
 
 			} else if readIndicator == 2 {
-				value = buffer[pos+12+int32(keySize) : pos+12+int32(keySize)+int32(valueSize)]
+				value = buffer[pos+data.CRC_SIZE+data.KEY_SIZE+data.VALUE_SIZE+int64(keySize) : pos+data.CRC_SIZE+data.KEY_SIZE+data.VALUE_SIZE+int64(keySize)+int64(valueSize)]
 				return value
 				//lastSmallerOffset = int32(offset)
 				//pos += 4

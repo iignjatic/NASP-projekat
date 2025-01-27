@@ -6,7 +6,7 @@ import (
 
 type BlockNode struct {
 	Block *data.Block
-	Key   uint32 //redni broj bloka
+	Key   string //redni broj bloka
 	Prev  *BlockNode
 	Next  *BlockNode
 }
@@ -19,10 +19,10 @@ type LRUlist struct {
 type BlockCache struct {
 	Capacity uint32
 	LRUlist  *LRUlist
-	BlockMap map[uint32]*BlockNode
+	BlockMap map[string]*BlockNode
 }
 
-func (cache *BlockCache) checkCache(key uint32) *data.Block {
+func (cache *BlockCache) CheckCache(key string) *data.Block {
 	_, exists := cache.BlockMap[key]
 	if exists {
 		return cache.BlockMap[key].Block
@@ -31,7 +31,7 @@ func (cache *BlockCache) checkCache(key uint32) *data.Block {
 	}
 }
 
-func (cache *BlockCache) addCache(key uint32, block *data.Block) {
+func (cache *BlockCache) AddCache(key string, block *data.Block) {
 	node, exists := cache.BlockMap[key]
 	if exists {
 		if cache.LRUlist.Head != node {
@@ -47,7 +47,7 @@ func (cache *BlockCache) addCache(key uint32, block *data.Block) {
 			Block: block,
 			Key:   key,
 			Prev:  nil,
-			Next:  cache.LRUlist.Head,
+			Next:  nil,
 		}
 		if cache.LRUlist.Head == nil {
 			cache.LRUlist.Head = newNode
@@ -68,6 +68,7 @@ func (cache *BlockCache) addCache(key uint32, block *data.Block) {
 				cache.LRUlist.Tail.Next = nil
 			}
 		}
+		cache.BlockMap[key] = newNode
 	}
 	if cache.Capacity != 0 {
 		cache.Capacity--

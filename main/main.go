@@ -1,6 +1,7 @@
 package main
 
 import (
+	"NASP-PROJEKAT/BlockCache"
 	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/SSTable"
 	"NASP-PROJEKAT/data"
@@ -13,18 +14,18 @@ import (
 )
 
 type Config struct {
-	BlockSize     int `json:"BlockSize"`
-	MemTableSize  int `json:"MemTableSize"`
-	CacheSize     int `json:"CacheSize"`
-	SummarySample int `json:"SummarySample"`
+	BlockSize     uint64 `json:"BlockSize"`
+	MemTableSize  uint64 `json:"MemTableSize"`
+	CacheSize     uint64 `json:"CacheSize"`
+	SummarySample uint64 `json:"SummarySample"`
 }
 
 func main() {
 	//DEFAULT VRIJEDNOSTI KONFIGURACIJE
-	//var BLOCK_SIZE uint32 = 16
+	var BLOCK_SIZE uint64 = 70
 	//var MEMTABLE_SIZE uint32 = 30
 	//var CACHE_SIZE uint32 = 10
-	//var SUMMARY_SAMPLE uint32 = 5
+	var SUMMARY_SAMPLE uint64 = 5
 
 	configFile, err := os.Open("../config.json")
 	if err != nil {
@@ -42,10 +43,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to unmarshal JSON: %v", err)
 	} else {
-		/*BLOCK_SIZE = uint32(config.BlockSize)
-		MEMTABLE_SIZE = uint32(config.MemTableSize)
-		CACHE_SIZE = uint32(config.CacheSize)
-		SUMMARY_SAMPLE = uint32(config.SummarySample)*/
+		BLOCK_SIZE = uint64(config.BlockSize)
+		//MEMTABLE_SIZE = uint32(config.MemTableSize)
+		//CACHE_SIZE = uint32(config.CacheSize)
+		SUMMARY_SAMPLE = uint64(config.SummarySample)
 	}
 
 	//PRISTUPANJE KONFIGURACIONIM ATRIBUTIMA
@@ -59,14 +60,25 @@ func main() {
 		- memtable
 		- wal
 		- cache
-		- sstable
+
 
 	*/
 
 	dataSeg := &SSTable.DataSegment{}
 	index := &SSTable.Index{}
-	summary := &SSTable.Summary{}
-	blockManager := &BlockManager.BlockManager{}
+	summary := &SSTable.Summary{
+		Sample: SUMMARY_SAMPLE,
+	}
+	LRUlist := &BlockCache.LRUlist{}
+	blockMap := make(map[string]*BlockCache.BlockNode)
+	blockCache := &BlockCache.BlockCache{
+		LRUlist:  LRUlist,
+		Capacity: 10,
+		BlockMap: blockMap,
+	}
+	blockManager := &BlockManager.BlockManager{
+		BlockCache: *blockCache,
+	}
 
 	files, _ := ioutil.ReadDir("../SSTable/files")
 	numOfSSTables := len(files) / 3
@@ -83,7 +95,7 @@ func main() {
 		fmt.Println("3. DELETE [ key ]")
 
 		fmt.Scan(&input)
-		//input = 2
+		//input = 1
 
 		if input == 1 {
 			//GET operacija
@@ -109,11 +121,23 @@ func main() {
 					IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(i) + ".bin",
 					SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(i) + ".bin",
 				}
-				sst.Summary.SegmentSize = 1 //OVO PODESITI DA SE CITA IZ FAJLA
+				summarySize, err := os.Stat(sst.SummaryFilePath)
+				if err != nil {
+					panic(err)
+				}
+				indexSize, err := os.Stat(sst.IndexFilePath)
+				if err != nil {
+					panic(err)
+				}
+				dataSize, err := os.Stat(sst.DataFilePath)
+				if err != nil {
+					panic(err)
+				}
+				sst.Summary.SegmentSize = uint64(summarySize.Size()) / BLOCK_SIZE
+				sst.Index.SegmentSize = uint64(indexSize.Size()) / BLOCK_SIZE
+				sst.DataSegment.SegmentSize = uint64(dataSize.Size()) / BLOCK_SIZE
 				sst.Summary.First = "key1"
 				sst.Summary.Last = "key6"
-				sst.Index.SegmentSize = 2
-				sst.DataSegment.SegmentSize = 29
 				value = sst.Get(key)
 				if value == nil {
 					continue

@@ -7,7 +7,7 @@ import (
 
 type Index struct {
 	Blocks        []*data.Block
-	SegmentSize   uint32
+	SegmentSize   uint64
 	IndexFilePath string
 	//	IndexTable    map[string]uint32
 }
@@ -23,18 +23,18 @@ func (index *Index) MakeIndex(records []*data.Record) {
 	// }
 }
 
-func (index *Index) recordToBytes(record *data.Record, size uint32, offset uint32) []byte {
+func (index *Index) recordToBytes(record *data.Record, size uint64, offset uint64) []byte {
 	recordBytes := make([]byte, size)
-	var keySize uint32 = record.KeySize
+	var keySize uint64 = record.KeySize
 	var key string = record.Key
 
-	binary.LittleEndian.PutUint32(recordBytes[0:], keySize)
-	copy(recordBytes[4:], []byte(key))
-	binary.LittleEndian.PutUint32(recordBytes[4+keySize:], offset)
+	binary.LittleEndian.PutUint64(recordBytes[0:], keySize)
+	copy(recordBytes[data.KEY_SIZE:], []byte(key))
+	binary.LittleEndian.PutUint64(recordBytes[data.KEY_SIZE+keySize:], offset)
 
 	return recordBytes
 }
 
-func (index *Index) getRecordSize(record *data.Record) uint32 {
-	return 2*4 + record.KeySize //key, key size i offset
+func (index *Index) getRecordSize(record *data.Record) uint64 {
+	return 8 + data.KEY_SIZE + record.KeySize //key, key size i offset
 }

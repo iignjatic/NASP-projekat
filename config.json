@@ -1,5 +1,5 @@
 {
-  "BlockSize": 16,
+  "BlockSize": 70,
   "MemTableSize": 30,
   "CacheSize": 10,
   "SummarySample":5

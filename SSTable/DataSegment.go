@@ -7,7 +7,7 @@ import (
 
 type DataSegment struct {
 	Blocks       []*data.Block
-	SegmentSize  uint32
+	SegmentSize  uint64
 	DataFilePath string
 }
 
@@ -114,31 +114,31 @@ type DataSegment struct {
 
 // }
 
-func (dataSegment *DataSegment) RecordToBytes(record *data.Record, size uint32, indicator byte) []byte {
+func (dataSegment *DataSegment) RecordToBytes(record *data.Record, size uint64, indicator byte) []byte {
 	recordBytes := make([]byte, size)
-	var crc uint32 = record.Crc
-	var keySize uint32 = record.KeySize
-	var valueSize uint32 = record.ValueSize
+	var crc uint64 = record.Crc
+	var keySize uint64 = record.KeySize
+	var valueSize uint64 = record.ValueSize
 	var key string = record.Key
 	var value []byte = record.Value
 	var tombstone bool = record.Tombstone
 	var timestamp = record.Timestamp
 
-	binary.LittleEndian.PutUint32(recordBytes[0:], crc)
-	binary.LittleEndian.PutUint32(recordBytes[4:], keySize)
-	binary.LittleEndian.PutUint32(recordBytes[8:], valueSize)
+	binary.LittleEndian.PutUint64(recordBytes[0:], crc)
+	binary.LittleEndian.PutUint64(recordBytes[data.CRC_SIZE:], keySize)
+	binary.LittleEndian.PutUint64(recordBytes[data.CRC_SIZE+data.KEY_SIZE:], valueSize)
 	//recordBytes = append(recordBytes, indicator)
-	copy(recordBytes[12:], []byte(key))
-	copy(recordBytes[12+keySize:], value)
+	copy(recordBytes[data.KEY_SIZE+data.CRC_SIZE+data.VALUE_SIZE:], []byte(key))
+	copy(recordBytes[data.KEY_SIZE+data.CRC_SIZE+data.VALUE_SIZE+keySize:], value)
 	if tombstone {
-		recordBytes[12+keySize+valueSize] = 1
+		recordBytes[data.KEY_SIZE+data.CRC_SIZE+data.VALUE_SIZE+keySize+valueSize] = 1
 	} else {
-		recordBytes[12+keySize+valueSize] = 0
+		recordBytes[data.KEY_SIZE+data.CRC_SIZE+data.VALUE_SIZE+keySize+valueSize] = 0
 	}
-	copy(recordBytes[12+keySize+valueSize+1:], []byte(timestamp))
+	copy(recordBytes[data.KEY_SIZE+data.CRC_SIZE+data.VALUE_SIZE+keySize+valueSize+data.TOMBSTONE_SIZE:], []byte(timestamp))
 	return recordBytes
 }
 
-func (dataSegment *DataSegment) GetRecordSize(record *data.Record) uint32 {
-	return 3*4 + record.KeySize + record.ValueSize + 1 + 10
+func (dataSegment *DataSegment) GetRecordSize(record *data.Record) uint64 {
+	return data.CRC_SIZE + data.KEY_SIZE + data.VALUE_SIZE + record.KeySize + record.ValueSize + data.TIMESTAMP_SIZE + data.TOMBSTONE_SIZE
 }
