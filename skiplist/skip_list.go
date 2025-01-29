@@ -1,12 +1,13 @@
 package skiplist
 
 import (
+	"NASP-PROJEKAT/data"
 	"math/rand"
 )
 
 type Node struct {
 	key   string
-	value []byte
+	value *data.Record
 	next  []*Node
 }
 
@@ -38,7 +39,7 @@ povratna vrijednost: nil
 prvo se odredjuje broj nivoa na kojima ce se pojavljivati cvor
 dalje se prevezuju pokazivaci
 */
-func (s *SkipList) addElement(key string, value []byte) {
+func (s *SkipList) addElement(key string, value *data.Record) {
 	levels := s.roll()
 	newNode := &Node{
 		key:   key,
