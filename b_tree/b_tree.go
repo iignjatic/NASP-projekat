@@ -284,22 +284,29 @@ func (tree *BTree) InsertRecord(record *data.Record) {
 	tree.insert(tree.root, record)
 }
 
-func (tree *BTree) InOrderTraversal(node *BTreeNode) {
+func (tree *BTree) InOrderTraversal(node *BTreeNode, records *[]data.Record) {
 	if node == nil {
 		return
 	}
 
 	for i := 0; i < node.recordNum; i++ {
 		if i < len(node.children) {
-			tree.InOrderTraversal(node.children[i])
+			tree.InOrderTraversal(node.children[i], records)
 		}
 
-		fmt.Printf("Key='%s', Value='%s'\n", node.records[i].Key, string(node.records[i].Value))
+		//fmt.Printf("Key='%s', Value='%s'\n", node.records[i].Key, string(node.records[i].Value))
+		*records = append(*records, *node.records[i])
 	}
 
 	if len(node.children) > node.recordNum {
-		tree.InOrderTraversal(node.children[node.recordNum])
+		tree.InOrderTraversal(node.children[node.recordNum], records)
 	}
+}
+
+func (tree *BTree) GetSortedRecords() []data.Record {
+	var records []data.Record
+	tree.InOrderTraversal(tree.root, &records)
+	return records
 }
 
 /*
