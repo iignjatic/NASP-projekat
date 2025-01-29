@@ -16,6 +16,7 @@ import (
 type Config struct {
 	BlockSize     uint64 `json:"BlockSize"`
 	MemTableSize  uint64 `json:"MemTableSize"`
+	MemTableCount uint64 `json:"MemTableCount"`
 	CacheSize     uint64 `json:"CacheSize"`
 	SummarySample uint64 `json:"SummarySample"`
 }
