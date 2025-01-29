@@ -28,7 +28,7 @@ func NewSkipList(capacity int) *SkipList {
 /*
 funkcija za odredjivanje broja nivoa elementa
 */
-func (s *SkipList) roll() int {
+func (s *SkipList) Roll() int {
 	level := 0
 	// possible ret values from rand are 0 and 1
 	// we stop shen we get a 0
@@ -48,9 +48,9 @@ povratna vrijednost: nil
 prvo se odredjuje broj nivoa na kojima ce se pojavljivati cvor
 dalje se prevezuju pokazivaci
 */
-func (s *SkipList) addElement(key string, value *data.Record) {
+func (s *SkipList) AddElement(key string, value *data.Record) {
 	//update ako je vec u listi
-	if s.searchElement(key) != nil {
+	if s.SearchElement(key) != nil {
 		current := s.head
 		for i := s.maxHeight; i >= 0; i-- {
 			for current.next[i] != nil && current.next[i].key <= key {
@@ -64,7 +64,7 @@ func (s *SkipList) addElement(key string, value *data.Record) {
 		return
 	}
 	//ako nije pronadjen dodaje se u skiplistu
-	levels := s.roll()
+	levels := s.Roll()
 	newNode := &Node{
 		key:   key,
 		value: value,
@@ -85,7 +85,7 @@ funkcija za pretragu u skiplisti
 parametri: kljuc koji se trazi
 povratna vrijednost: ako je nadjen onda cvor ako ne onda nil
 */
-func (s *SkipList) searchElement(key string) *Node {
+func (s *SkipList) SearchElement(key string) *Node {
 	current := s.head
 	levels := len(current.next)
 	for i := levels - 1; i >= 0; i-- {
@@ -108,7 +108,7 @@ povratna vrijednost: nil
 ideja: krecem s vrha i zapamtim cvorove koji su potencijalno neposredno ispred zeljenog za brisanje
 poslije provjerim koji od njih su
 */
-func (s *SkipList) removeElement(key string) {
+func (s *SkipList) RemoveElement(key string) {
 	current := s.head
 	levels := len(current.next)
 
@@ -126,7 +126,7 @@ func (s *SkipList) removeElement(key string) {
 
 // sortiranje zapisa
 // vraca niz sortiranih
-func (s *SkipList) sortElements() []*data.Record {
+func (s *SkipList) SortElements() []*data.Record {
 	var records []*data.Record
 	current := s.head.next[0]
 	for current != nil {
