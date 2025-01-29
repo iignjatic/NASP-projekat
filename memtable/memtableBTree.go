@@ -98,31 +98,12 @@ func (memt *MemtableB) Delete(key string) error {
 	return nil
 }
 
-// flush sortira podatke po kljucu
-// nakon upisivanja podataka na disk, oslobadja memtable
-/*func (memt *MemtableB) Flush() ([]data.Record, error) {
-	fmt.Println("Radi se Flush()")
-	if memt.currentSize == 0 {
-		return nil, errors.New("nothing to flush")
+// provjerava da li su sve tabele popunjene
+func (mm *MemtableManagerB) MemtableManagerIsFull() bool {
+	for i := 0; i < int(mm.maxTables); i++ {
+		if !mm.tables[i].IsFull() {
+			return false
+		}
 	}
-
-	records := b_tree.NewBTree(ORDER)
-	for _, record := range memt.data {
-		records = append(records, *record)
-	}
-
-	// sortiranje
-	sort.Slice(records, func(i, j int) bool {
-		return records[i].Key < records[j].Key
-	})
-
-	// flushing data
-	// SSTable logic
-
-	fmt.Println("Flush() zapisani podaci na disku")
-
-	// praznjenje memtable
-	memt.data = make(map[string]*data.Record)
-	memt.currentSize = 0
-	return records, nil
-}*/
+	return true
+}
