@@ -2,30 +2,30 @@ package memtable
 
 import (
 	"NASP-PROJEKAT/data"
+	"NASP-PROJEKAT/skiplist"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 )
 
-type Memtable struct {
-	data        map[string]*data.Record
+type MemtableS struct {
+	data        *skiplist.SkipList
 	maxSize     uint
 	readOnly    bool
 	currentSize uint
 }
 
-type MemtableManager struct {
-	tables      []*Memtable
+type MemtableManagerS struct {
+	tables      []*MemtableS
 	maxTables   uint
 	oldestIndex uint
 	acitveIndex uint
 }
 
 // kreiranje nove Memtable
-func CreateMemtable(maxSize uint, readOnly bool) *Memtable {
-	return &Memtable{
-		data:        make(map[string]*data.Record),
+func CreateMemtableS(maxSize uint, readOnly bool) *MemtableS {
+	return &MemtableS{
+		data:        skiplist.NewSkipList(int(maxSize)),
 		maxSize:     maxSize,
 		readOnly:    readOnly,
 		currentSize: 0,
@@ -33,22 +33,22 @@ func CreateMemtable(maxSize uint, readOnly bool) *Memtable {
 }
 
 // dodavanje Record strukture u Memtable
-func (memt *Memtable) AddRecord(record data.Record) error {
+func (memt *MemtableS) AddRecord(record data.Record) error {
 	if memt.readOnly {
 		return errors.New("cannot add to a read-only memtable")
 	}
 
 	//fmt.Printf("Dodavanje recorda sa kljucem %s\n", record.Key)
 
-	memt.data[record.Key] = &record
+	memt.data.AddElement(record.Key, &record)
 	memt.currentSize++
 	return nil
 }
 
 // dobavljenje recorda prema kljucu iz jedne memtabele
-func (memt *Memtable) Get(key string) (*data.Record, error) {
-	record, exist := memt.data[key]
-	if !exist || record.Tombstone {
+func (memt *MemtableS) Get(key string) (*data.Record, error) {
+	record := memt.data.SearchElement(key)
+	if record == nil {
 		return nil, errors.New("key not found")
 	}
 
@@ -56,45 +56,37 @@ func (memt *Memtable) Get(key string) (*data.Record, error) {
 	return record, nil
 }
 
-func (memt *Memtable) IsFull() bool {
+func (memt *MemtableS) IsFull() bool {
 	return memt.currentSize == memt.maxSize
 }
 
 // logicko brisanje recorda
-func (memt *Memtable) Delete(key string) error {
+func (memt *MemtableS) Delete(key string) error {
 	if memt.readOnly {
 		return errors.New("cannot delete from a read-only memtable")
 	}
 
-	record, exist := memt.data[key]
-	if !exist {
+	record := memt.data.SearchElement(key)
+	if record == nil {
 		//fmt.Printf("Record za kljuc %s nije pronadjen, funkcija Delete()", key)
 		return errors.New("key not found")
 	}
 
 	record.Tombstone = true
 	record.Timestamp = time.Now().UTC().Format(time.RFC3339)
-	memt.data[key] = record
+	memt.data.AddElement(record.Key, record)
 	return nil
 }
 
 // flush sortira podatke po kljucu
 // nakon upisivanja podataka na disk, oslobadja memtable
-func (memt *Memtable) Flush() ([]data.Record, error) {
+func (memt *MemtableS) Flush() ([]*data.Record, error) {
 	fmt.Println("Radi se Flush()")
 	if memt.currentSize == 0 {
 		return nil, errors.New("nothing to flush")
 	}
 
-	records := make([]data.Record, 0, len(memt.data))
-	for _, record := range memt.data {
-		records = append(records, *record)
-	}
-
-	// sortiranje
-	sort.Slice(records, func(i, j int) bool {
-		return records[i].Key < records[j].Key
-	})
+	records := memt.data.SortElements()
 
 	// flushing data
 	// SSTable logic
@@ -102,25 +94,25 @@ func (memt *Memtable) Flush() ([]data.Record, error) {
 	//fmt.Println("Flush() zapisani podaci na disku")
 
 	// praznjenje memtable
-	memt.data = make(map[string]*data.Record)
+	memt.data = skiplist.NewSkipList(int(memt.maxSize))
 	memt.currentSize = 0
 	return records, nil
 }
 
 // kreiranje novog memtable menadzera koji ce raditi sa maxTables tabela, koji svaki imaju po maksimalno maxSize elementa
-func CreateMemtableManager(maxTables, maxSize uint) *MemtableManager {
-	manager := MemtableManager{
-		tables:      make([]*Memtable, 0, maxTables),
+func CreateMemtableManagerS(maxTables, maxSize uint) *MemtableManagerS {
+	manager := MemtableManagerS{
+		tables:      make([]*MemtableS, 0, maxTables),
 		maxTables:   maxTables,
 		oldestIndex: 0,
 		acitveIndex: 0,
 	}
 
-	memtable := CreateMemtable(maxSize, false)
+	memtable := CreateMemtableS(maxSize, false)
 	manager.tables = append(manager.tables, memtable)
 
 	for i := 0; i < int(maxTables)-1; i++ {
-		memtable := CreateMemtable(maxSize, true)
+		memtable := CreateMemtableS(maxSize, true)
 		manager.tables = append(manager.tables, memtable)
 	}
 
@@ -128,7 +120,7 @@ func CreateMemtableManager(maxTables, maxSize uint) *MemtableManager {
 }
 
 // provjerava da li su sve tabele popunjene
-func (mm *MemtableManager) MemtableManagerIsFull() bool {
+func (mm *MemtableManagerS) MemtableManagerIsFull() bool {
 	for i := 0; i < int(mm.maxTables); i++ {
 		if !mm.tables[i].IsFull() {
 			return false
@@ -138,7 +130,7 @@ func (mm *MemtableManager) MemtableManagerIsFull() bool {
 }
 
 // dodavanje novog recorda u odgovarajuci memtable
-func (mm *MemtableManager) AddRecord(record data.Record) error {
+func (mm *MemtableManagerS) AddRecord(record data.Record) error {
 	activeMemtable := mm.tables[mm.acitveIndex]
 
 	if activeMemtable.readOnly {
@@ -170,7 +162,7 @@ func (mm *MemtableManager) AddRecord(record data.Record) error {
 // "najstarija" tabela se oslobadja i postaje nova aktivna tabela (read-write tabela)
 // dok ona koja je bila aktivna postaje read-only
 // ako sve tabele nisu popunjene, onda samo pomjera index akitvne tabele i azurira stanje read-only polja
-func (mm *MemtableManager) RotateMemtables() error {
+func (mm *MemtableManagerS) RotateMemtables() error {
 	//fmt.Println("Radi se RotateMemtables()")
 	if mm.MemtableManagerIsFull() {
 		oldestTable := mm.tables[mm.oldestIndex]
@@ -191,11 +183,11 @@ func (mm *MemtableManager) RotateMemtables() error {
 	return nil
 }
 
-func (mm *MemtableManager) GetRecord(key string) (*data.Record, error) {
+func (mm *MemtableManagerS) GetRecord(key string) (*data.Record, error) {
 	for i := 0; i < int(mm.maxTables); i++ {
 		index := (int(mm.acitveIndex) - i + int(mm.maxTables)) % int(mm.maxTables)
 		table := mm.tables[index]
-		if record, exists := table.data[key]; exists {
+		if record := table.data.SearchElement(key); record != nil {
 			if record.Tombstone {
 				return nil, errors.New("key not found")
 			}
@@ -205,24 +197,24 @@ func (mm *MemtableManager) GetRecord(key string) (*data.Record, error) {
 	return nil, errors.New("key not found")
 }
 
-func (mm *MemtableManager) DeleteRecord(key string) error {
+func (mm *MemtableManagerS) DeleteRecord(key string) error {
 	acitveTable := mm.tables[mm.acitveIndex]
 	if acitveTable.readOnly {
 		return errors.New("cannot delete form read-only table")
 	}
 
-	record, exist := acitveTable.data[key]
-	if !exist {
+	record := acitveTable.data.SearchElement(key)
+	if record == nil {
 		return errors.New("key not found")
 	}
 	record.Tombstone = true
 	record.Timestamp = time.Now().UTC().Format(time.RFC3339)
-	acitveTable.data[key] = record
+	acitveTable.data.AddElement(record.Key, record)
 	return nil
 }
 
 // flush svih tabela, npr ako je potrebno prije iskljucenja sistema
-func (mm *MemtableManager) FlushAll() error {
+func (mm *MemtableManagerS) FlushAll() error {
 	fmt.Println("Radi se FlushAll()")
 	for i := 0; i < int(mm.maxTables); i++ {
 		table := mm.tables[i]
@@ -232,7 +224,8 @@ func (mm *MemtableManager) FlushAll() error {
 	}
 	return nil
 }
-func (mm *MemtableManager) LoadFromWal(records []data.Record) {
+
+func (mm *MemtableManagerS) LoadFromWal(records []data.Record) {
 	for _, rec := range records {
 		mm.AddRecord(rec)
 	}

@@ -85,7 +85,7 @@ funkcija za pretragu u skiplisti
 parametri: kljuc koji se trazi
 povratna vrijednost: ako je nadjen onda cvor ako ne onda nil
 */
-func (s *SkipList) SearchElement(key string) *Node {
+func (s *SkipList) SearchElement(key string) *data.Record {
 	current := s.head
 	levels := len(current.next)
 	for i := levels - 1; i >= 0; i-- {
@@ -93,7 +93,7 @@ func (s *SkipList) SearchElement(key string) *Node {
 			current = current.next[i]
 		}
 		if current.next[i] != nil && current.next[i].key == key {
-			return current.next[i]
+			return current.next[i].value
 
 		}
 	}

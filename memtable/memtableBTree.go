@@ -5,13 +5,12 @@ import (
 	"NASP-PROJEKAT/data"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 )
 
-const ORDER = 4
-
 type MemtableB struct {
-	data        b_tree.BTree
+	data        *b_tree.BTree
 	maxSize     uint
 	readOnly    bool
 	currentSize uint
@@ -26,7 +25,7 @@ type MemtableManagerB struct {
 
 func CreateMemtableB(maxSize uint, readOnly bool) *MemtableB {
 	return &MemtableB{
-		data:        *b_tree.NewBTree(ORDER),
+		data:        b_tree.NewBTree(int(math.Sqrt(float64(maxSize)))),
 		maxSize:     maxSize,
 		readOnly:    readOnly,
 		currentSize: 0,
@@ -114,7 +113,7 @@ func (memt *MemtableB) Flush() ([]data.Record, error) {
 	fmt.Println("Flush() zapisani podaci na disku")
 
 	// praznjenje memtable
-	memt.data = *b_tree.NewBTree(ORDER)
+	memt.data = b_tree.NewBTree(int(math.Sqrt(float64(memt.maxSize))))
 	memt.currentSize = 0
 	return records, nil
 }
