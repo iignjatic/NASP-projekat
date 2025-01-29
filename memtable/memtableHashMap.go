@@ -80,15 +80,15 @@ func (memt *Memtable) Delete(key string) error {
 
 // flush sortira podatke po kljucu
 // nakon upisivanja podataka na disk, oslobadja memtable
-func (memt *Memtable) Flush() ([]data.Record, error) {
+func (memt *Memtable) Flush() ([]*data.Record, error) {
 	fmt.Println("Radi se Flush()")
 	if memt.currentSize == 0 {
 		return nil, errors.New("nothing to flush")
 	}
 
-	records := make([]data.Record, 0, len(memt.data))
+	records := make([]*data.Record, 0, len(memt.data))
 	for _, record := range memt.data {
-		records = append(records, *record)
+		records = append(records, record)
 	}
 
 	// sortiranje

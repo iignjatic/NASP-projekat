@@ -45,25 +45,6 @@ func (memt *MemtableB) AddRecord(record data.Record) error {
 	return nil
 }
 
-// dodavanje novog para kljuc-vrijednost u memtable
-/*func (memt *MemtableB) AddNewRecord(key string, value []byte) error {
-	if memt.readOnly {
-		return errors.New("cannot add to a read-only memtable")
-	}
-
-	if memt.currentSize >= memt.maxSize {
-		_, err := memt.Flush()
-		if err != nil {
-			return err
-		}
-	}
-
-	record := data.Record{Key: key, Value: value, Tombstone: false, Timestamp: time.Now().UTC().Format(time.RFC3339), KeySize: uint64(len(key)), ValueSize: uint64(len(value))}
-	memt.data.InsertRecord(&record)
-	memt.currentSize++
-	return nil
-}*/
-
 // dobavljenje recorda prema kljucu iz jedne memtabele
 func (memt *MemtableB) Get(key string) (*data.Record, error) {
 	record, err := memt.data.Get(key)
@@ -99,7 +80,7 @@ func (memt *MemtableB) Delete(key string) error {
 
 // flush sortira podatke po kljucu
 // nakon upisivanja podataka na disk, oslobadja memtable
-func (memt *MemtableB) Flush() ([]data.Record, error) {
+func (memt *MemtableB) Flush() ([]*data.Record, error) {
 	fmt.Println("Radi se Flush()")
 	if memt.currentSize == 0 {
 		return nil, errors.New("nothing to flush")
@@ -110,7 +91,7 @@ func (memt *MemtableB) Flush() ([]data.Record, error) {
 	// flushing data
 	// SSTable logic
 
-	fmt.Println("Flush() zapisani podaci na disku")
+	//fmt.Println("Flush() zapisani podaci na disku")
 
 	// praznjenje memtable
 	memt.data = b_tree.NewBTree(int(math.Sqrt(float64(memt.maxSize))))
