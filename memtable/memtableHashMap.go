@@ -8,18 +8,6 @@ import (
 	"time"
 )
 
-const BlockSize = 1024
-
-/*type Record struct {
-	Crc       uint32
-	KeySize   uint64
-	ValueSize uint64
-	Key       string
-	Value     []byte
-	Tombstone bool
-	Timestamp string
-}*/
-
 type Memtable struct {
 	data        map[string]*data.Record
 	maxSize     uint
