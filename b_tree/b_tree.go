@@ -1,6 +1,7 @@
 package b_tree
 
 import (
+	"NASP-PROJEKAT/data"
 	"errors"
 	"fmt"
 	"time"
@@ -12,18 +13,8 @@ import (
 // max m-1 keys for every node
 // min (m/2) upper - 1 keys for every node
 
-type Record struct {
-	Crc       uint32
-	KeySize   uint64
-	ValueSize uint64
-	Key       string
-	Value     []byte
-	Tombstone bool
-	Timestamp string
-}
-
 type BTreeNode struct {
-	records     []*Record
+	records     []*data.Record
 	children    []*BTreeNode
 	recordNum   int
 	childrenNum int
@@ -36,7 +27,7 @@ type BTree struct {
 
 func NewBTreeNode(order int) *BTreeNode {
 	return &BTreeNode{
-		records:     make([]*Record, 0, order-1),
+		records:     make([]*data.Record, 0, order-1),
 		children:    make([]*BTreeNode, 0, order),
 		recordNum:   0,
 		childrenNum: 0,
@@ -101,7 +92,7 @@ func (node *BTreeNode) search(key string) (int, bool) {
 // pretraga koja se bazira na binarnoj pretrazi
 // ulazni parametar: kljuc koji se trazi
 // povratne vrijednosti: ako je pronasao record vraca njega i nil za gresku
-func (t *BTree) Get(key string) (*Record, error) {
+func (t *BTree) Get(key string) (*data.Record, error) {
 	for next := t.root; next != nil; {
 		index, found := next.search(key)
 
@@ -127,7 +118,7 @@ func (tree *BTree) Delete(key string) error {
 }
 
 // dodaje novi record na odredjeni index u cvoru
-func (node *BTreeNode) insertRecordAt(index int, record *Record) {
+func (node *BTreeNode) insertRecordAt(index int, record *data.Record) {
 	if index < len(node.records) {
 		// kopira se na mjesta od index+1 do recordNum+1 vrijednost od index do recordNum
 		// odnosno pravi se jedno prazno mjesto ako ne dodajemo na kraj
@@ -156,7 +147,7 @@ func (node *BTreeNode) insertChildAt(index int, childNode *BTreeNode) {
 // u proslijedjenom cvoru ostaju elementi od pocetka do sredine (ne ukljucujuci srednji)
 // povratne vrijednosti su: sredisnji record (koji se kasnije podize nivo iznad)
 // i novi node u kojem se nalaze record-i od sredisnjeg do kraja sa odgovarajucom djecom
-func (tree *BTree) split(node *BTreeNode) (*Record, *BTreeNode) {
+func (tree *BTree) split(node *BTreeNode) (*data.Record, *BTreeNode) {
 	minRecords := tree.m/2 - 1
 	mid := minRecords
 	midRecord := node.records[mid]
@@ -228,7 +219,7 @@ func (tree *BTree) rotate(node *BTreeNode, index int) bool {
 // provjerava prvo da li kljuc postoji, ako postoji samo azurira vrijedost
 // ako je cvor do kojeg smo stigli list, znaci da smo dosli do mjesta na kom treba dodati record
 // ako nije list nastavlja se pozivati rekurzivno metoda nad odgovarajucim djetetom
-func (tree *BTree) insert(node *BTreeNode, record *Record) bool {
+func (tree *BTree) insert(node *BTreeNode, record *data.Record) bool {
 	index, found := node.search(record.Key)
 	var inserted bool
 	if found {
@@ -269,7 +260,7 @@ func (tree *BTree) splitRoot() {
 }
 
 func (tree *BTree) Insert(key string, value []byte) {
-	record := &Record{
+	record := &data.Record{
 		Key:       key,
 		Value:     value,
 		KeySize:   uint64(len(key)),
@@ -285,7 +276,7 @@ func (tree *BTree) Insert(key string, value []byte) {
 	tree.insert(tree.root, record)
 }
 
-func (tree *BTree) InsertRecord(record *Record) {
+func (tree *BTree) InsertRecord(record *data.Record) {
 	if tree.root == nil {
 		tree.root = NewBTreeNode(tree.m)
 	}
@@ -346,8 +337,18 @@ func main() {
 	tree.Insert("c", []byte("value10"))
 	tree.Insert("b", []byte("value10"))
 	tree.Insert("a", []byte("value10"))
-	tree.Insert("A", []byte("value10"))
-	tree.Insert("1", []byte("value10"))
+	record1 := data.Record{
+		Key:   "A",
+		Value: []byte("value 10"),
+	}
+	record2 := data.Record{
+		Key:   "1",
+		Value: []byte("value10"),
+	}
+	//tree.Insert("A", []byte("value10"))
+	//tree.Insert("1", []byte("value10"))
+	tree.InsertRecord(&record1)
+	tree.InsertRecord(&record2)
 
 	// ispisujemo stablo
 	fmt.Println("Stablo nakon umetanja:")
@@ -384,4 +385,5 @@ func main() {
 
 	fmt.Println("InOrder obilazak:")
 	tree.InOrderTraversal(tree.root)
-}*/
+}
+*/
