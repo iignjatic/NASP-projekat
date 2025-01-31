@@ -5,6 +5,7 @@ import (
 	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/SSTable"
 	"NASP-PROJEKAT/data"
+	"NASP-PROJEKAT/memtable"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -17,6 +18,7 @@ type Config struct {
 	BlockSize     uint64 `json:"BlockSize"`
 	MemTableSize  uint64 `json:"MemTableSize"`
 	MemTableCount uint64 `json:"MemTableCount"`
+	MemTableType  string `json:"MemTableType"`
 	CacheSize     uint64 `json:"CacheSize"`
 	SummarySample uint64 `json:"SummarySample"`
 }
@@ -24,7 +26,9 @@ type Config struct {
 func main() {
 	//DEFAULT VRIJEDNOSTI KONFIGURACIJE
 	var BLOCK_SIZE uint64 = 70
-	//var MEMTABLE_SIZE uint32 = 30
+	var MEMTABLE_SIZE uint64 = 30
+	var MEMTABLE_COUNT uint64 = 2
+	var MEMTABLE_TYPE string = "hashmap"
 	//var CACHE_SIZE uint32 = 10
 	var SUMMARY_SAMPLE uint64 = 5
 
@@ -45,7 +49,9 @@ func main() {
 		log.Fatalf("Failed to unmarshal JSON: %v", err)
 	} else {
 		BLOCK_SIZE = uint64(config.BlockSize)
-		//MEMTABLE_SIZE = uint32(config.MemTableSize)
+		MEMTABLE_SIZE = uint64(config.MemTableSize)
+		MEMTABLE_COUNT = uint64(config.MemTableCount)
+		MEMTABLE_TYPE = config.MemTableType
 		//CACHE_SIZE = uint32(config.CacheSize)
 		SUMMARY_SAMPLE = uint64(config.SummarySample)
 	}
@@ -64,6 +70,11 @@ func main() {
 
 
 	*/
+
+	memtable, err := memtable.CreateMemtableManager(MEMTABLE_TYPE, int(MEMTABLE_COUNT), int(MEMTABLE_SIZE))
+	if err != nil {
+		panic(err)
+	}
 
 	dataSeg := &SSTable.DataSegment{}
 	index := &SSTable.Index{}
@@ -104,6 +115,10 @@ func main() {
 			fmt.Scan(&key)
 			//key = "key6"
 
+			if record, _ := memtable.Get(key); record != nil {
+				fmt.Println("Zapis je pronadjen : ", string(value))
+				continue
+			}
 			/* if SEARCHMEMTABLE != nil
 				continue
 
@@ -164,6 +179,13 @@ func main() {
 				writeToMEM
 
 				if mem is full{
+
+				flushedRecords, flush, err := memtable.Put(record)
+				if err != nil{
+					panic(err)
+				} else if flush {
+					// flushedRecords je niz pokazivaca za sstable
+				}
 			*/
 			//	sst.MakeSSTable(records)
 
@@ -207,6 +229,12 @@ func main() {
 
 				updateMEM
 
+				flushedRecords, flush, err := memtable.Delete(record)
+				if err != nil{
+					panic(err)
+				} else if flush {
+					// flushedRecords je niz pokazivaca za sstable
+				}
 			*/
 
 		}
