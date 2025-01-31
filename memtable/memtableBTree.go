@@ -1,4 +1,4 @@
-package memtable
+package main
 
 import (
 	"NASP-PROJEKAT/b_tree"
@@ -231,7 +231,7 @@ func (mm *MemtableManagerB) LoadFromWal(records []data.Record) {
 	}
 }
 
-/*func main() {
+func main() {
 	// kreiraj menadzer sa 2 tabele kapaciteta 5
 	memtableManager := CreateMemtableManagerBTree(2, 5)
 
@@ -306,4 +306,4 @@ func (mm *MemtableManagerB) LoadFromWal(records []data.Record) {
 	} else {
 		fmt.Println("Sve tabele su uspešno flushovane!")
 	}
-}*/
+}

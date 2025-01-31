@@ -1,4 +1,4 @@
-package memtable
+package main
 
 import (
 	"NASP-PROJEKAT/data"

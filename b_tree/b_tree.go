@@ -98,7 +98,10 @@ func (t *BTree) Get(key string) (*data.Record, error) {
 		index, found := next.search(key)
 
 		if found {
-			return next.records[index], nil
+			if index < len(next.records) && next.records != nil {
+				return next.records[index], nil
+			}
+			return nil, errors.New("record not found in records")
 		}
 
 		if len(next.children) == 0 {
