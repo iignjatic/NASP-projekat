@@ -1,4 +1,4 @@
-package main
+package memtable
 
 import (
 	"NASP-PROJEKAT/b_tree"
@@ -222,6 +222,7 @@ func (mm *MemtableManagerB) LoadFromWal(records []*data.Record) ([][]*data.Recor
 	return recordsToFlush, nil
 }
 
+/*
 /*
 func main() {
 	// kreiraj menadzer sa 2 tabele kapaciteta 5

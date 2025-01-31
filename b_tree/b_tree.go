@@ -93,18 +93,15 @@ func (node *BTreeNode) search(key string) (int, bool) {
 // ulazni parametar: kljuc koji se trazi
 // povratne vrijednosti: ako je pronasao record vraca njega i nil za gresku
 func (t *BTree) Get(key string) (*data.Record, error) {
-
 	for next := t.root; next != nil; {
 		index, found := next.search(key)
-
+		fmt.Printf("u funkciji get indeks: %d i found: %t", index, found)
 		if found {
-			if index < len(next.records) && next.records != nil {
-				return next.records[index], nil
-			}
-			return nil, errors.New("record not found in records")
+			return next.records[index], nil
 		}
 
 		if len(next.children) == 0 {
+			fmt.Println("usla u petlju if len(next.children) == 0")
 			return nil, errors.New("key not found")
 		}
 
@@ -322,6 +319,10 @@ func main() {
 	// kreiramo B stablo sa redom 4
 	tree := NewBTree(4)
 
+	rec, err := tree.Get("1")
+	fmt.Println(err)
+	fmt.Println(rec)
+
 	// dodajemo elemente
 	//tree.Insert("a", []byte("value1"))
 	//tree.Insert("b", []byte("value2"))
@@ -399,6 +400,8 @@ func main() {
 	tree.PrintTree(tree.root, 0)
 
 	fmt.Println("InOrder obilazak:")
-	tree.InOrderTraversal(tree.root)
-}
-*/
+	//records := tree.GetSortedRecords()
+	//for _, rec := range records {
+	//	fmt.Println(rec.Key)
+	//}
+}*/
