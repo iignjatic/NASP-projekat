@@ -5,7 +5,6 @@ import (
 	"NASP-PROJEKAT/skiplist"
 	"errors"
 	"fmt"
-	"time"
 )
 
 type MemtableS struct {
@@ -33,14 +32,12 @@ func CreateMemtableS(maxSize uint, readOnly bool) *MemtableS {
 }
 
 // dodavanje Record strukture u Memtable
-func (memt *MemtableS) AddRecord(record data.Record) error {
+func (memt *MemtableS) AddRecord(record *data.Record) error {
 	if memt.readOnly {
 		return errors.New("cannot add to a read-only memtable")
 	}
 
-	//fmt.Printf("Dodavanje recorda sa kljucem %s\n", record.Key)
-
-	memt.data.AddElement(record.Key, &record)
+	memt.data.AddElement(record.Key, record)
 	memt.currentSize++
 	return nil
 }
@@ -52,7 +49,6 @@ func (memt *MemtableS) Get(key string) (*data.Record, error) {
 		return nil, errors.New("key not found")
 	}
 
-	//fmt.Printf("Pronadjen record sa kljucem %s\n", key)
 	return record, nil
 }
 
@@ -73,7 +69,6 @@ func (memt *MemtableS) Delete(key string) error {
 	}
 
 	record.Tombstone = true
-	record.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	memt.data.AddElement(record.Key, record)
 	return nil
 }
@@ -87,11 +82,6 @@ func (memt *MemtableS) Flush() ([]*data.Record, error) {
 	}
 
 	records := memt.data.SortElements()
-
-	// flushing data
-	// SSTable logic
-
-	//fmt.Println("Flush() zapisani podaci na disku")
 
 	// praznjenje memtable
 	memt.data = skiplist.NewSkipList(int(memt.maxSize))
@@ -130,46 +120,52 @@ func (mm *MemtableManagerS) MemtableManagerIsFull() bool {
 }
 
 // dodavanje novog recorda u odgovarajuci memtable
-func (mm *MemtableManagerS) Put(record data.Record) error {
+func (mm *MemtableManagerS) Put(record *data.Record) ([]*data.Record, bool, error) {
 	activeMemtable := mm.tables[mm.acitveIndex]
 
 	if activeMemtable.readOnly {
-		return errors.New("cannot add to a read-only memtable")
+		return nil, false, errors.New("cannot add to a read-only memtable")
 	}
 
+	var flushedRecords []*data.Record
+
 	if activeMemtable.IsFull() {
-		//fmt.Println("Aktivna memtable je puna, rotiranje tabela")
-		if err := mm.RotateMemtables(); err != nil {
-			return fmt.Errorf("failed to rotate memtables: %w", err)
+		rec, err := mm.RotateMemtables()
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to rotate memtables: %w", err)
 		}
+		flushedRecords = rec
 		activeMemtable = mm.tables[mm.acitveIndex]
 	}
 
 	if err := activeMemtable.AddRecord(record); err != nil {
-		return err
+		return nil, false, err
 	}
 
 	if activeMemtable.currentSize == activeMemtable.maxSize && mm.MemtableManagerIsFull() {
-		if err := mm.RotateMemtables(); err != nil {
-			return fmt.Errorf("failed to rotate memtables: %w", err)
+		rec, err := mm.RotateMemtables()
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to rotate memtables: %w", err)
 		}
+		flushedRecords = rec
 	}
 
-	return nil
+	return flushedRecords, true, nil
 }
 
 // rotira memtabele, kada su sve popunjene "najstarija" tabela se flush-uje
 // "najstarija" tabela se oslobadja i postaje nova aktivna tabela (read-write tabela)
 // dok ona koja je bila aktivna postaje read-only
 // ako sve tabele nisu popunjene, onda samo pomjera index akitvne tabele i azurira stanje read-only polja
-func (mm *MemtableManagerS) RotateMemtables() error {
-	//fmt.Println("Radi se RotateMemtables()")
+func (mm *MemtableManagerS) RotateMemtables() ([]*data.Record, error) {
+	var records []*data.Record
 	if mm.MemtableManagerIsFull() {
 		oldestTable := mm.tables[mm.oldestIndex]
-		if _, err := oldestTable.Flush(); err != nil {
-			return fmt.Errorf("failed to flush table at index %d: %w", mm.oldestIndex, err)
+		rec, err := oldestTable.Flush()
+		if err != nil {
+			return nil, fmt.Errorf("failed to flush table at index %d: %w", mm.oldestIndex, err)
 		}
-		//fmt.Printf("Flush() tabele indeksa %d", mm.oldestIndex)
+		records = rec
 		oldestTable.readOnly = false
 
 		//mm.acitveIndex = mm.oldestIndex
@@ -180,7 +176,7 @@ func (mm *MemtableManagerS) RotateMemtables() error {
 		mm.tables[mm.acitveIndex].readOnly = false
 	}
 
-	return nil
+	return records, nil
 }
 
 func (mm *MemtableManagerS) Get(key string) (*data.Record, error) {
@@ -197,38 +193,33 @@ func (mm *MemtableManagerS) Get(key string) (*data.Record, error) {
 	return nil, errors.New("key not found")
 }
 
-func (mm *MemtableManagerS) Delete(key string) error {
+func (mm *MemtableManagerS) Delete(record *data.Record) ([]*data.Record, bool, error) {
 	acitveTable := mm.tables[mm.acitveIndex]
-	if acitveTable.readOnly {
-		return errors.New("cannot delete form read-only table")
-	}
 
-	record := acitveTable.data.SearchElement(key)
-	if record == nil {
-		return errors.New("key not found")
+	found_record := acitveTable.data.SearchElement(record.Key)
+	if found_record == nil {
+		flushedRecords, flush, err := mm.Put(record)
+		if err != nil {
+			return nil, false, err
+		}
+		return flushedRecords, flush, nil
 	}
 	record.Tombstone = true
-	record.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	acitveTable.data.AddElement(record.Key, record)
-	return nil
+	return nil, false, nil
 }
 
-// flush svih tabela, npr ako je potrebno prije iskljucenja sistema
-func (mm *MemtableManagerS) FlushAll() error {
-	fmt.Println("Radi se FlushAll()")
-	for i := 0; i < int(mm.maxTables); i++ {
-		table := mm.tables[i]
-		if _, err := table.Flush(); err != nil {
-			return fmt.Errorf("failed to flush table at index %d: %w", i, err)
+func (mm *MemtableManagerS) LoadFromWal(records []*data.Record) ([][]*data.Record, error) {
+	var recordsToFlush [][]*data.Record
+	for _, rec := range records {
+		records, flush, err := mm.Put(rec)
+		if err != nil {
+			return nil, err
+		} else if flush {
+			recordsToFlush = append(recordsToFlush, records)
 		}
 	}
-	return nil
-}
-
-func (mm *MemtableManagerS) LoadFromWal(records []data.Record) {
-	for _, rec := range records {
-		mm.Put(rec)
-	}
+	return recordsToFlush, nil
 }
 
 /*
@@ -238,7 +229,7 @@ func main() {
 
 	// dodaj rekorde dok se sve tabele ne popune
 	for i := 1; i <= 10; i++ {
-		err := memtableManager.Put(data.Record{
+		_, _, err := memtableManager.Put(&data.Record{
 			Key:       fmt.Sprintf("key%d", i),
 			Value:     []byte(fmt.Sprintf("value%d", i)),
 			Tombstone: false,
@@ -287,7 +278,7 @@ func main() {
 
 	// Testiraj dodavanje novih rekorda nakon flushovanja
 	for i := 11; i <= 12; i++ {
-		err := memtableManager.Put(data.Record{
+		_, _, err := memtableManager.Put(&data.Record{
 			Key:       fmt.Sprintf("value%d", i),
 			Value:     []byte(fmt.Sprintf("value%d", i)),
 			Tombstone: false,
@@ -300,11 +291,4 @@ func main() {
 		}
 	}
 
-	// Završni flush svih tabela
-	err = memtableManager.FlushAll()
-	if err != nil {
-		fmt.Println("Greška pri flushovanju svih tabela:", err)
-	} else {
-		fmt.Println("Sve tabele su uspešno flushovane!")
-	}
 }*/
