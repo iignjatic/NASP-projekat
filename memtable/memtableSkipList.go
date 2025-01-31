@@ -130,7 +130,7 @@ func (mm *MemtableManagerS) MemtableManagerIsFull() bool {
 }
 
 // dodavanje novog recorda u odgovarajuci memtable
-func (mm *MemtableManagerS) AddRecord(record data.Record) error {
+func (mm *MemtableManagerS) Put(record data.Record) error {
 	activeMemtable := mm.tables[mm.acitveIndex]
 
 	if activeMemtable.readOnly {
@@ -183,7 +183,7 @@ func (mm *MemtableManagerS) RotateMemtables() error {
 	return nil
 }
 
-func (mm *MemtableManagerS) GetRecord(key string) (*data.Record, error) {
+func (mm *MemtableManagerS) Get(key string) (*data.Record, error) {
 	for i := 0; i < int(mm.maxTables); i++ {
 		index := (int(mm.acitveIndex) - i + int(mm.maxTables)) % int(mm.maxTables)
 		table := mm.tables[index]
@@ -197,7 +197,7 @@ func (mm *MemtableManagerS) GetRecord(key string) (*data.Record, error) {
 	return nil, errors.New("key not found")
 }
 
-func (mm *MemtableManagerS) DeleteRecord(key string) error {
+func (mm *MemtableManagerS) Delete(key string) error {
 	acitveTable := mm.tables[mm.acitveIndex]
 	if acitveTable.readOnly {
 		return errors.New("cannot delete form read-only table")
@@ -227,18 +227,18 @@ func (mm *MemtableManagerS) FlushAll() error {
 
 func (mm *MemtableManagerS) LoadFromWal(records []data.Record) {
 	for _, rec := range records {
-		mm.AddRecord(rec)
+		mm.Put(rec)
 	}
 }
 
 /*
 func main() {
 	// kreiraj menadzer sa 2 tabele kapaciteta 5
-	memtableManager := CreateMemtableManager(2, 5)
+	memtableManager := CreateMemtableManagerS(2, 5)
 
 	// dodaj rekorde dok se sve tabele ne popune
 	for i := 1; i <= 10; i++ {
-		err := memtableManager.AddRecord(data.Record{
+		err := memtableManager.Put(data.Record{
 			Key:       fmt.Sprintf("key%d", i),
 			Value:     []byte(fmt.Sprintf("value%d", i)),
 			Tombstone: false,
@@ -262,7 +262,7 @@ func main() {
 
 	// Testiraj dobijanje recorda nakon flushovanja
 	for i := 1; i <= 10; i++ {
-		record, err := memtableManager.GetRecord(fmt.Sprintf("key%d", i))
+		record, err := memtableManager.Get(fmt.Sprintf("key%d", i))
 		if err != nil {
 			fmt.Printf("Greška pri dobijanju recorda key%d: %v\n", i, err)
 		} else {
@@ -271,14 +271,14 @@ func main() {
 	}
 
 	// Testiraj brisanje i ponovno dobijanje recorda
-	err := memtableManager.DeleteRecord("key3")
+	err := memtableManager.Delete("key3")
 	if err != nil {
 		fmt.Println("Greška pri brisanju recorda key3:", err)
 	} else {
 		fmt.Println("Record sa ključem 'key3' obrisan!")
 	}
 
-	record, err := memtableManager.GetRecord("key3")
+	record, err := memtableManager.Get("key3")
 	if err != nil {
 		fmt.Println("Greška pri dobijanju recorda key3 (trebalo bi da ne postoji):", err)
 	} else {
@@ -287,7 +287,7 @@ func main() {
 
 	// Testiraj dodavanje novih rekorda nakon flushovanja
 	for i := 11; i <= 12; i++ {
-		err := memtableManager.AddRecord(data.Record{
+		err := memtableManager.Put(data.Record{
 			Key:       fmt.Sprintf("value%d", i),
 			Value:     []byte(fmt.Sprintf("value%d", i)),
 			Tombstone: false,
