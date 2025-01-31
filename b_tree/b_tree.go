@@ -93,11 +93,16 @@ func (node *BTreeNode) search(key string) (int, bool) {
 // ulazni parametar: kljuc koji se trazi
 // povratne vrijednosti: ako je pronasao record vraca njega i nil za gresku
 func (t *BTree) Get(key string) (*data.Record, error) {
+
 	for next := t.root; next != nil; {
 		index, found := next.search(key)
 
 		if found {
 			return next.records[index], nil
+		}
+
+		if len(next.children) == 0 {
+			return nil, errors.New("key not found")
 		}
 
 		next = next.children[index]
