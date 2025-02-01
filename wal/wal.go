@@ -64,13 +64,8 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 	}
 	defer file.Close()
 
-	// reserve one byte for number of bytes that are pushed on memtable from this segment
-	_, err = file.Write([]byte{0})
-	if err != nil {
-		return err
-	}
-
-	offset := make([]byte, 8)		// first byte is busy
+	// reserve eight bytes for number of bytes that are pushed on memtable from this segment
+	offset := make([]byte, 8)
 	binary.LittleEndian.PutUint64(offset, 0)
 	_, err = file.Write(offset)
 	if err != nil {
@@ -143,8 +138,8 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 			i += len(recordBytes)
 		}
 	}
-	recordsTemp := DefragmentRecords(records)
-	return recordsTemp, nil
+	// recordsTemp := DefragmentRecords(records)
+	return records, nil
 } 
 
 func DefragmentRecords(r []*Record) []*Record {
