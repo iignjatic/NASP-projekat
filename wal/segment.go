@@ -12,6 +12,7 @@ type Segment struct {
 	FullCapacity uint64
 	Transferred	 bool
 	FilePath     string
+	Offset		 uint64
 }
 
 func NewSegment(id int) *Segment {
@@ -21,6 +22,7 @@ func NewSegment(id int) *Segment {
 		Blocks:       []*Block{firstBlock},
 		FullCapacity: SEGMENT_SIZE,
 		Transferred:  false,
+		Offset: 	  0,
 	}
 	segment.FilePath = fmt.Sprintf("wal_%d.bin", segment.ID)
 	return segment

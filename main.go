@@ -1,8 +1,8 @@
 package main
 
 import (
+	"NASP-PROJEKAT/wal"
 	"fmt"
-	"nasp/wal"
 )
 
 func main() {
@@ -35,32 +35,8 @@ func main() {
 	fmt.Print("-----------------------------------------------------------------------------------------\n")
 	fmt.Print("MESSAGES:\n")
 	w := wal.NewWal()
-	// n_test := []*wal.Record{
-	// 	wal.NewRecord("key1", []byte("U sumama, drvece skripi pod tezinom snijega, a vjetar nosi miris borovine. Ptice pjevaju ujutro, dok se rosa sunca presijava na travi. Rijeke tiho teku, prelazeci kroz kamencice, a divlje zivotinje polako preplivaju prirodne staze. Planine uzdizu se u daljini.......")),
-	// 	wal.NewRecord("key1", []byte("Ivana")),
-	// 	wal.NewRecord("key1", []byte("Andjela")),
-	// }
 
-	// p_test := []*wal.Record{
-	// 	wal.NewRecord("key1", []byte("Ivana")),
-	// 	wal.NewRecord("key2", []byte("Andjela")),
-	// 	wal.NewRecord("key3", []byte("Elena")),
-	// 	wal.NewRecord("key4", []byte("Aleksandar")),
-	// 	wal.NewRecord("key4", []byte("Milan")),
-	// }
-
-	// b_test := []*wal.Record{
-	// 	wal.NewRecord("key1", []byte("Ivana")),
-	// 	wal.NewRecord("key2", []byte("Andjela")),
-	// 	wal.NewRecord("key3", []byte("Elena")),
-	// 	wal.NewRecord("key4", []byte("Aleksandar")),
-	// 	wal.NewRecord("key5", []byte("Tijana")),
-	// 	wal.NewRecord("key5", []byte("Sunce zalazi iza planinskog vrha.")),
-	// 	wal.NewRecord("key5", []byte("Gledao sam Hunger Games dok sam ovo radio. Zanimljivost je 70 od 100")),
-	// 	wal.NewRecord("key5", []byte("Milan")),
-	// }
-
-	f_test := []*wal.Record{
+	test := []*wal.Record{
 		wal.NewRecord("key1", []byte("Ivana")),
 		wal.NewRecord("key2", []byte("Andjela")),
 		wal.NewRecord("key3", []byte("Elena")),
@@ -86,12 +62,15 @@ func main() {
 		wal.NewRecord("key4", []byte("Aleksandar")),
 	}
 
-	for i:=0; i<len(f_test); i++ {
-		w.AddRecord(f_test[i])
+	for i:=0; i<len(test); i++ {
+		w.AddRecord(test[i])
 	}
 
-	for i:=0; i<len(w.Segments);i++ {
-		fmt.Printf("\n----------------------Segment %d, Transferred: %v----------------------\n", w.Segments[i].ID, w.Segments[i].Transferred)
-		w.Segments[i].PrintBlocks()
-	}
+	// for i:=0; i<len(w.Segments);i++ {
+	// 	fmt.Printf("\n----------------------Segment %d, Transferred: %v----------------------\n", w.Segments[i].ID, w.Segments[i].Transferred)
+	// 	w.Segments[i].PrintBlocks()
+	// }
+	fmt.Print("-----------------------------------------------------------------------------------------")
+	fmt.Print("-----------------------------------------------------------------------------------------\n")
+	w.PrintRecordsFromSegments()
 }
