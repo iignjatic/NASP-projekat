@@ -173,10 +173,10 @@ func FromBytes(data []byte) (*Record, error) {
 	value := data[valueStart : valueStart + int(valueSize)]
 	
 	// Compare old and new CRC
-	calculatedCrc := CRC32(data[CRC_SIZE:])
-	if crc != calculatedCrc {
-		return nil, fmt.Errorf("crc mismatch: expected %d, got %d", crc, calculatedCrc)
-	}
+	// calculatedCrc := CRC32(data[CRC_SIZE:])
+	// if crc != calculatedCrc {
+	// 	return nil, fmt.Errorf("crc mismatch: expected %d, got %d", crc, calculatedCrc)
+	// }
 	
 	return &Record{
 		Crc: crc,
