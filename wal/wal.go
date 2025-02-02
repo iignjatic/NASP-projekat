@@ -212,4 +212,4 @@ func DefragmentRecords(r []*Record) []*Record {
 	return temp
 }
 
-// jos kada upisujem podatke u novom pokretanju programa, treba da se dodaju novi segment fajlovi, sto i jeste istina PLUS da se kupi posljednji segment koji nije pun, i da se na njega nastavi pisanje,..
+// crc not working i jos kada upisujem podatke u novom pokretanju programa, treba da se dodaju novi segment fajlovi, sto i jeste istina PLUS da se kupi posljednji segment koji nije pun, i da se na njega nastavi pisanje,..
