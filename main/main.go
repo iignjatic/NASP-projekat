@@ -101,7 +101,7 @@ func main() {
 			//GET operacija
 
 			fmt.Scan(&key)
-			//key = "key6"
+			//key = "key2"
 
 			/* if SEARCHMEMTABLE != nil
 				continue
@@ -136,11 +136,12 @@ func main() {
 				sst.Summary.SegmentSize = uint64(summarySize.Size()) / BLOCK_SIZE
 				sst.Index.SegmentSize = uint64(indexSize.Size()) / BLOCK_SIZE
 				sst.DataSegment.SegmentSize = uint64(dataSize.Size()) / BLOCK_SIZE
-				sst.Summary.First = "key1"
-				sst.Summary.Last = "key6"
 				value = sst.Get(key)
 				if value == nil {
 					continue
+				} else if len(value) == 0 {
+					fmt.Println("Zapis je obrisan")
+					break
 				} else {
 					fmt.Println("Zapis je pronadjen : ", string(value))
 					//update CACHE!!!!!!!!!!!!!!!!!!
