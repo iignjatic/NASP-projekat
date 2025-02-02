@@ -118,9 +118,16 @@ func (dataSegment *DataSegment) RecordToBytes(record *data.Record, size uint64, 
 	recordBytes := make([]byte, size)
 	var crc uint64 = record.Crc
 	var keySize uint64 = record.KeySize
-	var valueSize uint64 = record.ValueSize
+	var valueSize uint64
+	var value []byte
+	if record.Tombstone == true {
+		valueSize = 0
+		value = []byte{}
+	} else {
+		valueSize = record.ValueSize
+		value = record.Value
+	}
 	var key string = record.Key
-	var value []byte = record.Value
 	var tombstone bool = record.Tombstone
 	var timestamp = record.Timestamp
 

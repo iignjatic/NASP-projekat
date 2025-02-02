@@ -18,7 +18,7 @@ type SSTable struct {
 	SummaryFilePath string
 }
 
-func (sst *SSTable) ReadMeta() {
+func (sst *SSTable) ReadMeta() { //podaci o prvom i poslednjem kljucu
 	file, err := os.Open(sst.SummaryFilePath)
 	if err != nil {
 		panic(err)
@@ -29,7 +29,8 @@ func (sst *SSTable) ReadMeta() {
 	file.Seek(8, 0)
 	bytes = make([]byte, firstKeySize)
 	_, err = file.Read(bytes)
-	//firstKey := string(bytes)
+	firstKey := string(bytes)
+	sst.Summary.First = firstKey
 	file.Seek(8+int64(firstKeySize), 0)
 	bytes = make([]byte, 8)
 	_, err = file.Read(bytes)
@@ -37,7 +38,8 @@ func (sst *SSTable) ReadMeta() {
 	file.Seek(int64(data.KEY_SIZE+data.KEY_SIZE+firstKeySize), 0)
 	bytes = make([]byte, lastKeySize)
 	_, err = file.Read(bytes)
-	//lastKey := string(bytes)
+	lastKey := string(bytes)
+	sst.Summary.Last = lastKey
 	sst.Summary.Meta = 2*data.KEY_SIZE + firstKeySize + lastKeySize
 
 }
@@ -178,6 +180,7 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 		if i >= len(records) { //upisali smo sve rekorde
 			break
 		}
+
 		for tempBlockSize >= 0 && i < len(records) { //prolazak kroz jedan blok
 			recordSize := sst.DataSegment.GetRecordSize(records[i])
 			allRecordSize := recordSize
