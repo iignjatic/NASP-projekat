@@ -88,7 +88,6 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 
 	for i:=0;i<len(s.Blocks);i++ {
 		for j:=0;j<len(s.Blocks[i].Records);j++ {
-			// s.Blocks[i].Records[j].Value = TrimZeros(s.Blocks[i].Records[j].Value)
 			recordBytes, err := s.Blocks[i].Records[j].ToBytes()
 			if err != nil {
 				return err
@@ -212,4 +211,5 @@ func DefragmentRecords(r []*Record) []*Record {
 	return temp
 }
 
-// crc not working i jos kada upisujem podatke u novom pokretanju programa, treba da se dodaju novi segment fajlovi, sto i jeste istina PLUS da se kupi posljednji segment koji nije pun, i da se na njega nastavi pisanje,..
+// kada upisujem podatke u novom pokretanju programa, treba da se dodaju novi segment fajlovi, sto i jeste istina PLUS da se kupi posljednji segment koji nije pun, i da se na njega nastavi pisanje,..
+// pad sistema
