@@ -61,16 +61,23 @@ func main() {
 		wal.NewRecord("key3", []byte("Elena")),
 		wal.NewRecord("key4", []byte("Aleksandar")),
 	}
-
+	
 	for i:=0; i<len(test); i++ {
 		w.AddRecord(test[i])
 	}
 
-	// for i:=0; i<len(w.Segments);i++ {
-	// 	fmt.Printf("\n----------------------Segment %d, Transferred: %v----------------------\n", w.Segments[i].ID, w.Segments[i].Transferred)
-	// 	w.Segments[i].PrintBlocks()
-	// }
-	fmt.Print("-----------------------------------------------------------------------------------------")
-	fmt.Print("-----------------------------------------------------------------------------------------\n")
-	w.PrintRecordsFromSegments()
+	for i:=0; i<len(w.Segments);i++ {
+		fmt.Printf("\n----------------------Segment %d, Transferred: %v----------------------\n", w.Segments[i].ID, w.Segments[i].Transferred)
+		w.Segments[i].PrintBlocks()
+	}
+	fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+	fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
+	defragmentedRecords, err := w.ReadAllSegments()
+	if err != nil {
+		fmt.Printf("Segment deserialization failed: %v\n", err)
+		return
+	}
+	for i:=0; i<len(defragmentedRecords); i++ {
+		fmt.Println(defragmentedRecords[i])
+	}
 }

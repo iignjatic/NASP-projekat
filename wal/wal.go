@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 const DIRECTORY_PATH = "segments"
@@ -28,14 +29,28 @@ func NewWal() *Wal {
 }
 
 func (w *Wal) AddNewSegment() {
-	newSegmentID := len(w.Segments)
+	w.SegmentPaths = w.ReadSegmentNames()
+	newSegmentID := len(w.SegmentPaths)
 	newSegment := NewSegment(newSegmentID)
 	w.Segments = append(w.Segments, newSegment)
 	w.CurrentSegment = newSegment
-	s := fmt.Sprint(w.DirectoryPath,"/",newSegment.FilePath)
-	w.SegmentPaths = append(w.SegmentPaths, s)
+	w.SegmentPaths = append(w.SegmentPaths, newSegment.FilePath)
 	fmt.Printf("Created new Segment %s\n", newSegment.FilePath)
-	w.PrintCurrentWalSegmentsIDs()
+}
+
+func (w *Wal) ReadSegmentNames() []string {
+	files, err := os.ReadDir(w.DirectoryPath)
+	if err != nil {
+		fmt.Printf("Error reading directory: %v", err)
+		return nil
+	}
+	var segmentNames []string
+	for i:=0; i<len(files); i++ {
+		if !files[i].IsDir() {
+			segmentNames = append(segmentNames, files[i].Name())
+		}
+	}
+	return segmentNames
 }
 
 func (w *Wal) AddRecord(record *Record) {
@@ -49,7 +64,6 @@ func (w *Wal) AddRecord(record *Record) {
 
 func (w *Wal) FlushCurrentSegment() {
 	if w.CurrentSegment != nil {
-		// fmt.Printf("Flushing segment %s to disk...\n", w.CurrentSegment.FilePath)
 		w.WriteSegmentToFile(w.CurrentSegment)
 		w.CurrentSegment.Transferred = true
 	}
@@ -91,7 +105,7 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to opet file %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
 	defer file.Close()
 	
@@ -106,7 +120,7 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 
 	// set the position to offset
 	if offset != 0 {
-		_, err := file.Seek(int64(offset), 0)
+		_, err := file.Seek(int64(offset), io.SeekCurrent)
 		if err != nil {
 			return nil, fmt.Errorf("failed to seek to offset %d: %w", offset, err)
 		}
@@ -114,6 +128,7 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 
 	var records []*Record
 	buffer := make([]byte, BLOCK_SIZE)
+	var data []byte
 
 	for {
 		n, err := file.Read(buffer)
@@ -123,12 +138,15 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 		if n == 0 {
 			break
 		}
+		
+		// handles leftovers
+		data = append(data, buffer[:n]...)
 
 		i:=0
-		for i<n {
-			record, err := FromBytes(buffer[i:])
+		for i<len(data) {
+			record, err := FromBytes(data[i:])
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse record: %w", err)
+				return nil, fmt.Errorf("failed to parse record at position %d: %w",i, err)
 			}
 			records = append(records, record)
 			recordBytes, err := record.ToBytes()
@@ -137,10 +155,34 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 			}
 			i += len(recordBytes)
 		}
+		data = data[i:]
 	}
-	// recordsTemp := DefragmentRecords(records)
 	return records, nil
-} 
+}
+
+func (w *Wal) ReadAllSegments() ([]*Record, error) {
+	var allRecords []*Record
+	for _, segmentName := range w.ReadSegmentNames() {
+		segmentPath := filepath.Join(w.DirectoryPath, segmentName)
+
+		records, err := w.ReadSegmentFromFile(segmentPath)
+		if err != nil {
+			fmt.Printf("Error reading records from segment %s: %v\n", segmentPath, err)
+			continue
+		}
+		allRecords = append(allRecords, records...)
+	}
+	noZerosRecords := NoZerosRecords(allRecords)
+	defragmentedRecords := DefragmentRecords(noZerosRecords)
+	return defragmentedRecords, nil
+}
+
+func NoZerosRecords(r []*Record) []*Record {
+	for i:=0; i<len(r); i++ {
+		r[i].Value = TrimZeros(r[i].Value)
+	}
+	return r
+}
 
 func DefragmentRecords(r []*Record) []*Record {
 	var temp []*Record 
@@ -169,30 +211,5 @@ func DefragmentRecords(r []*Record) []*Record {
 	return temp
 }
 
-func (w *Wal) PrintRecordsFromSegments() {
-	for _, segmentPath := range w.SegmentPaths {
-		records, err := w.ReadSegmentFromFile(segmentPath)
-		if err != nil {
-			fmt.Printf("Error reading records from segment %s: %v\n", segmentPath, err)
-			continue
-		}
-
-		fmt.Printf("Records from sefment %s:\n", segmentPath)
-		for _, record := range records {
-			fmt.Println(record)
-		}
-	}
-}
-
-
-// func (w *Wal) RemoveSegment(ID int) []*Segment {
-// 	return append(w.Segments[:ID], w.Segments[ID+1:]...)
-// }
-
-func (w *Wal) PrintCurrentWalSegmentsIDs() {
-	fmt.Print("Current Wal Segment IDs: ")
-	for i:=0;i<len(w.Segments);i++ { 
-		fmt.Printf("%d ", w.Segments[i].ID)
-	}
-	fmt.Println()
-}
+// kada upisujem podatke u novom pokretanju programa, treba da se dodaju novi segment fajlovi, sto i jeste istina PLUS da se kupi posljednji segment koji nije pun, i da se na njega nastavi pisanje,..
+// pad sistema
