@@ -72,8 +72,8 @@ func (w *Wal) AddNewSegment() {
 		for _, record := range defragmentedRecords {
 			rec := NewRecord(record.Key, append([]byte{}, record.Value...))
 			w.AddRecord(rec)
-			w.CurrentSegment.PrintBlocks()
 		}
+		w.CurrentSegment.PrintBlocks()
 	} else {
 		newSegmentID := len(w.SegmentPaths)
 		newSegment := NewSegment(newSegmentID)
@@ -119,6 +119,9 @@ func (w *Wal) FlushCurrentSegment() {
 
 // a function that writes records to the segment file
 func (w *Wal) WriteSegmentToFile(s *Segment) error {
+	if err := os.MkdirAll(w.DirectoryPath, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
 	filePath := w.DirectoryPath + "/" + s.FilePath
 	file, err := os.Create(filePath)
 	if err != nil {

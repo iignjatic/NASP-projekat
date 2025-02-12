@@ -80,6 +80,11 @@ func HandleZeros(block *Block, record *Record) {
 	}
 
 	numOfZeros := block.FullCapacity - uint64(CalculateRecordSize(record)) - block.CurrentCapacity // current capacity is capacity of all records before THIS
+	fmt.Println(numOfZeros)
+	fmt.Println(block.FullCapacity)
+	fmt.Println(uint64(CalculateRecordSize(record)))
+	fmt.Println(block.CurrentCapacity)
+
 	if numOfZeros > 0 {
 		padding := make([]byte, numOfZeros)
 		record.Value = append(record.Value, padding...)	// zeros are not actual value so increasing ValueSize won't be done
