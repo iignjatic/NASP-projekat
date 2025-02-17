@@ -36,8 +36,13 @@ func ChosenOperation(currentBlock *Block, record *Record) byte {
 			// fragment the Record
 			return 'f'
 		} else {
-			// make a new Block and use Padding
-			return 'b'
+			if uint64(recordFullSize) > currentBlock.FullCapacity {
+				// make a new Block and use Fragmentation
+				return 'u'
+			} else {
+				// make a new Block and use Padding
+				return 'b'
+			}
 		}
 	}
 }
@@ -59,6 +64,11 @@ func (s *Segment) AddRecordToBlock(record *Record) {
 		HandleZeros(newBlock, record)
 	case 'f':
 		s.FragmentRecord(currentBlock, record)
+	case 'u':
+		newBlockID := currentBlock.ID + 1
+		newBlock := NewBlock(newBlockID)
+		s.Blocks = append(s.Blocks, newBlock)
+		s.FragmentRecord(newBlock, record)
 	}
 }
 
@@ -79,11 +89,7 @@ func HandleZeros(block *Block, record *Record) {
 		lastAddedRecord.ValueSize = uint64(len(lastAddedRecord.Value))
 	}
 
-	numOfZeros := block.FullCapacity - uint64(CalculateRecordSize(record)) - block.CurrentCapacity // current capacity is capacity of all records before THIS
-	fmt.Println(numOfZeros)
-	fmt.Println(block.FullCapacity)
-	fmt.Println(uint64(CalculateRecordSize(record)))
-	fmt.Println(block.CurrentCapacity)
+	numOfZeros := int64(block.FullCapacity) - int64(CalculateRecordSize(record)) - int64(block.CurrentCapacity) // current capacity is capacity of all records before THIS
 
 	if numOfZeros > 0 {
 		padding := make([]byte, numOfZeros)

@@ -71,9 +71,18 @@ func (w *Wal) AddNewSegment() {
 		w.CurrentSegment = lastUsedSegment
 		for _, record := range defragmentedRecords {
 			rec := NewRecord(record.Key, append([]byte{}, record.Value...))
+			if record.Type == 'f' {
+				rec.Type = 'f'
+			} else if record.Type == 'm' {
+				rec.Type = 'm'
+			} else if record.Type == 'l' {
+				rec.Type = 'l'
+			}
+			rec.Timestamp = record.Timestamp
+			rec.Crc = record.Crc
 			w.AddRecord(rec)
 		}
-		w.CurrentSegment.PrintBlocks()
+		// w.CurrentSegment.PrintBlocks()
 	} else {
 		newSegmentID := len(w.SegmentPaths)
 		newSegment := NewSegment(newSegmentID)
@@ -129,7 +138,7 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 	}
 	defer file.Close()
 
-	// reserve one byte for indicator of fullness of the segment and eight bytes for number of bytes that are pushed on memtable from this segment
+	// reserve one byte for indicator of fullness of the segment and eight bytes for number of bytes that are pushed on memtable from this segment IF THE SEGMENT IS FULL
 	offset := make([]byte, 9)
 	binary.LittleEndian.PutUint64(offset, 0)
 	_, err = file.Write(offset)
@@ -272,6 +281,7 @@ func (w *Wal) ReadAllSegments() ([]*Record, error) {
 func NoZerosRecords(r []*Record) []*Record {
 	for i:=0; i<len(r); i++ {
 		r[i].Value = TrimZeros(r[i].Value)
+		r[i].ValueSize = uint64(len(r[i].Value))
 	}
 	return r
 }
@@ -288,14 +298,16 @@ func DefragmentRecords(r []*Record) []*Record {
 			record.Tombstone = r[i].Tombstone
 			record.Type = 'a'
 			record.KeySize = r[i].KeySize
-			record.ValueSize = r[i].ValueSize
+			record.ValueSize += r[i].ValueSize
 			record.Key = r[i].Key
 			record.Value = append(record.Value, r[i].Value...)
 		}
 		if r[i].Type == 'm' {
 			record.Value = append(record.Value, r[i].Value...  )
+			record.ValueSize += r[i].ValueSize
 		} else if r[i].Type == 'l' {
 			record.Value = append(record.Value, r[i].Value...)
+			record.ValueSize += r[i].ValueSize
 			temp = append(temp, record)
 			record = NewRecord("", []byte(""))
 		}
@@ -303,6 +315,9 @@ func DefragmentRecords(r []*Record) []*Record {
 	return temp
 }
 
-// kada upisujem podatke u novom pokretanju programa, treba da se dodaju novi segment fajlovi, sto i jeste istina PLUS da se kupi posljednji segment koji nije pun, i da se na njega nastavi pisanje,.. posle svakog sacuvavanja,
+// MOGUCNOST nepostojanja fragmentacije na nivou segmenta
+// treba resetovati velicinu rekorda tokom defragmentacije
+// kada se ponovo prepisuju segmenti, ako je procitano da je fmla, to treba uzeti u obzir, kao i velicinu vrijednosti, jer sta ako je u nepopunjenom segmentu sredina ili kraj na pocetku tog segmenta, a u prethodnom koji ne citamo je pocetak ili sredina
+// treba uzeti u obzir velicinu rekorda tokom citanja podataka
 // pad sistema
 // povezi i dodaj funkcionalnost prebacivanja memtabeli i funkcionalnost za mijenjanje onih 8 bajtova kod potvrde sstabele
