@@ -47,8 +47,8 @@ func ChosenOperation(currentBlock *Block, record *Record) byte {
 	}
 }
 
-func (s *Segment) AddRecordToBlock(record *Record) {
-	currentBlock := s.Blocks[len(s.Blocks) - 1]
+func (w *Wal) AddRecordToBlock(record *Record) {
+	currentBlock := w.CurrentSegment.Blocks[len(w.CurrentSegment.Blocks) - 1]
 	chosenOperation := ChosenOperation(currentBlock, record)
 
 	switch(chosenOperation) {
@@ -60,15 +60,15 @@ func (s *Segment) AddRecordToBlock(record *Record) {
 	case 'b':
 		newBlockID := currentBlock.ID + 1
 		newBlock := NewBlock(newBlockID)
-		s.Blocks = append(s.Blocks, newBlock)
+		w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
 		HandleZeros(newBlock, record)
 	case 'f':
-		s.FragmentRecord(currentBlock, record)
+		w.FragmentRecord(currentBlock, record)
 	case 'u':
 		newBlockID := currentBlock.ID + 1
 		newBlock := NewBlock(newBlockID)
-		s.Blocks = append(s.Blocks, newBlock)
-		s.FragmentRecord(newBlock, record)
+		w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
+		w.FragmentRecord(newBlock, record)
 	}
 }
 
@@ -98,7 +98,7 @@ func HandleZeros(block *Block, record *Record) {
 	}
 }
 
-func (s *Segment) FragmentRecord (block *Block, record *Record) {
+func (w *Wal) FragmentRecord (block *Block, record *Record) {
 	allButValue := (uint64(CalculateRecordSize(record)) - uint64(len(record.Value)))
 	spaceFirst := block.FullCapacity - block.CurrentCapacity - allButValue
 	// FIRST
@@ -115,7 +115,7 @@ func (s *Segment) FragmentRecord (block *Block, record *Record) {
 
 	for remainingSize > 0 {
 		newBlock := NewBlock(block.ID + 1)
-		s.Blocks = append(s.Blocks, newBlock)
+		w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
 		block = newBlock
 
 		// MIDDLE

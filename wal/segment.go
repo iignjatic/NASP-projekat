@@ -3,7 +3,8 @@ package wal
 import "fmt"
 
 const (
-	SEGMENT_SIZE = 4 * BLOCK_SIZE
+	BLOCKS_PER_SEGMENT = 4
+	SEGMENT_SIZE = BLOCKS_PER_SEGMENT * BLOCK_SIZE
 )
 
 type Segment struct {

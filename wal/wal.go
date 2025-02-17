@@ -109,7 +109,7 @@ func (w *Wal) ReadSegmentNames() []string {
 }
 
 func (w *Wal) AddRecord(record *Record) {
-	w.CurrentSegment.AddRecordToBlock(record)
+	w.AddRecordToBlock(record)
 	if w.CurrentSegment.IsFull() {
 		w.FlushCurrentSegment()
 		w.HandleFullness(w.CurrentSegment)
