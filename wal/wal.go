@@ -308,9 +308,5 @@ func DefragmentRecords(r []*Record) []*Record {
 	return temp
 }
 
-// MOGUCNOST nepostojanja fragmentacije na nivou segmenta
-// treba resetovati velicinu rekorda tokom defragmentacije
-// kada se ponovo prepisuju segmenti, ako je procitano da je fmla, to treba uzeti u obzir, kao i velicinu vrijednosti, jer sta ako je u nepopunjenom segmentu sredina ili kraj na pocetku tog segmenta, a u prethodnom koji ne citamo je pocetak ili sredina
-// treba uzeti u obzir velicinu rekorda tokom citanja podataka
 // pad sistema
 // povezi i dodaj funkcionalnost prebacivanja memtabeli i funkcionalnost za mijenjanje onih 8 bajtova kod potvrde sstabele
