@@ -6,6 +6,7 @@ import (
 	"NASP-PROJEKAT/SSTable"
 	"NASP-PROJEKAT/data"
 	"NASP-PROJEKAT/memtable"
+	"NASP-PROJEKAT/wal"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -70,11 +71,12 @@ func main() {
 
 
 	*/
-
 	memtable, err := memtable.CreateMemtableManager(MEMTABLE_TYPE, int(MEMTABLE_COUNT), int(MEMTABLE_SIZE))
 	if err != nil {
 		panic(err)
 	}
+
+	w := wal.NewWal()
 
 	dataSeg := &SSTable.DataSegment{}
 	index := &SSTable.Index{}
@@ -171,8 +173,9 @@ func main() {
 
 		} else if input == 2 {
 			//PUT OPERACIJA
-
 			fmt.Scan(&key, &value)
+			rec := wal.NewRecord(key, append([]byte{}, value...))
+			w.AddRecord(rec)
 
 			/*
 				writeToWAL
