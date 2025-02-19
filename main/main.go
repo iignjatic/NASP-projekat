@@ -174,7 +174,7 @@ func main() {
 		} else if input == 2 {
 			//PUT OPERACIJA
 			fmt.Scan(&key, &value)
-			rec := wal.NewRecord(key, append([]byte{}, value...))
+			rec := wal.NewRecord(key, []byte(value))
 			w.AddRecord(rec)
 
 			/*
