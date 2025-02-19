@@ -53,15 +53,15 @@ func (w *Wal) AddRecordToBlock(record *Record) {
 
 	switch(chosenOperation) {
 	case 'n':
-		HandleZeros(currentBlock, record)
-		SaveRecordToBlock(currentBlock, record, false)
+		w.HandleZeros(currentBlock, record)
+		w.SaveRecordToBlock(currentBlock, record, false)
 	case 'p':
-		HandleZeros(currentBlock, record)
+		w.HandleZeros(currentBlock, record)
 	case 'b':
 		newBlockID := currentBlock.ID + 1
 		newBlock := NewBlock(newBlockID)
 		w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
-		HandleZeros(newBlock, record)
+		w.HandleZeros(newBlock, record)
 	case 'f':
 		w.FragmentRecord(currentBlock, record)
 	case 'u':
@@ -72,7 +72,7 @@ func (w *Wal) AddRecordToBlock(record *Record) {
 	}
 }
 
-func SaveRecordToBlock(block *Block, record  *Record, isPadding bool) {
+func (w *Wal) SaveRecordToBlock(block *Block, record  *Record, isPadding bool) {
 	if isPadding {
 		block.Records = append(block.Records, record)
 		block.CurrentCapacity += uint64(CalculateRecordSize(record)) - uint64(len(record.Value)) + record.ValueSize
@@ -80,9 +80,16 @@ func SaveRecordToBlock(block *Block, record  *Record, isPadding bool) {
 		block.Records = append(block.Records, record)
 		block.CurrentCapacity += uint64(CalculateRecordSize(record))
 	}
+	if w.CurrentSegment.IsFull() {
+		w.FlushCurrentSegment()
+		w.HandleFullness(w.CurrentSegment)
+		w.AddNewSegment()
+	} else {
+		w.FlushCurrentSegment()
+	}
 }
 
-func HandleZeros(block *Block, record *Record) {
+func (w *Wal) HandleZeros(block *Block, record *Record) {
 	if len(block.Records) > 0 {
 		lastAddedRecord := block.Records[len(block.Records)-1]
 		lastAddedRecord.Value = TrimZeros(lastAddedRecord.Value)
@@ -94,7 +101,7 @@ func HandleZeros(block *Block, record *Record) {
 	if numOfZeros > 0 {
 		padding := make([]byte, numOfZeros)
 		record.Value = append(record.Value, padding...)	// zeros are not actual value so increasing ValueSize won't be done
-		SaveRecordToBlock(block, record, true)
+		w.SaveRecordToBlock(block, record, true)
 	}
 }
 
@@ -107,13 +114,14 @@ func (w *Wal) FragmentRecord (block *Block, record *Record) {
 	copy(firstRecord.Value, record.Value[:spaceFirst])
 	firstRecord.ValueSize = spaceFirst
 	firstRecord.Type = 'f'
-	HandleZeros(block, &firstRecord)
-	SaveRecordToBlock(block, &firstRecord, false)
+	w.HandleZeros(block, &firstRecord)
+	w.SaveRecordToBlock(block, &firstRecord, false)
 	
 	remainingValue := record.Value[spaceFirst:]
 	remainingSize := uint64(len(remainingValue))
 
 	for remainingSize > 0 {
+		// kada se pravi novi segment pravi se novi blok takodje, ovdje kad se fragmentira pravi se opet novi blok i nastavlja se brojac od prethodnog segmenta
 		newBlock := NewBlock(block.ID + 1)
 		w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
 		block = newBlock
@@ -126,7 +134,7 @@ func (w *Wal) FragmentRecord (block *Block, record *Record) {
 			copy(middleRecord.Value, remainingValue[:spaceMiddle])
 			middleRecord.ValueSize = spaceMiddle
 			middleRecord.Type = 'm'
-			SaveRecordToBlock(block, &middleRecord, false)
+			w.SaveRecordToBlock(block, &middleRecord, false)
 
 			remainingValue = remainingValue[spaceMiddle:]
 			remainingSize -= block.FullCapacity - allButValue
@@ -137,7 +145,7 @@ func (w *Wal) FragmentRecord (block *Block, record *Record) {
 			copy(lastRecord.Value, remainingValue)
 			lastRecord.ValueSize = remainingSize
 			lastRecord.Type = 'l'
-			HandleZeros(block, &lastRecord)
+			w.HandleZeros(block, &lastRecord)
 			remainingSize = 0
 		}
 	}

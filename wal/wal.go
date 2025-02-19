@@ -110,13 +110,6 @@ func (w *Wal) ReadSegmentNames() []string {
 
 func (w *Wal) AddRecord(record *Record) {
 	w.AddRecordToBlock(record)
-	if w.CurrentSegment.IsFull() {
-		w.FlushCurrentSegment()
-		w.HandleFullness(w.CurrentSegment)
-		w.AddNewSegment()
-	} else {
-		w.FlushCurrentSegment()
-	}
 }
 
 func (w *Wal) FlushCurrentSegment() {
