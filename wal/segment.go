@@ -1,6 +1,9 @@
 package wal
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 const (
 	BLOCKS_PER_SEGMENT = 4
@@ -64,4 +67,16 @@ func (s *Segment) BackZeros(i int) uint64 {
 			return uint64(zerosCount)
 		}
 	}
+}
+
+// delete the segment
+func DeleteSegment(filePath string) error {
+	err := os.Remove(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file doesn't exist: %s", filePath)
+		}
+		return fmt.Errorf("failed deleting the file: %w", err)
+	}
+	return nil
 }

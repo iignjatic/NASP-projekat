@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-const DIRECTORY_PATH = "segments"
+const DIRECTORY_PATH = "../segments"
 
 type Wal struct {
 	DirectoryPath  string     // directory where Segments are stored
