@@ -121,11 +121,18 @@ func (w *Wal) FragmentRecord (block *Block, record *Record) {
 	remainingSize := uint64(len(remainingValue))
 
 	for remainingSize > 0 {
-		// kada se pravi novi segment pravi se novi blok takodje, ovdje kad se fragmentira pravi se opet novi blok i nastavlja se brojac od prethodnog segmenta
-		newBlock := NewBlock(block.ID + 1)
-		w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
-		block = newBlock
-
+		// this is because of making empty blocks when in the last save the new Segment is added
+		lastBlock := w.CurrentSegment.Blocks[len(w.CurrentSegment.Blocks)-1]
+		if lastBlock == block {
+			// if the last block is the same as current, add new block
+			newBlock := NewBlock(block.ID + 1)
+			w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
+			block = newBlock	
+		} else {
+			// otherwise, make the last block the current 
+			block = lastBlock
+		}
+		
 		// MIDDLE
 		spaceMiddle := block.FullCapacity-allButValue
 		if remainingSize > spaceMiddle {
