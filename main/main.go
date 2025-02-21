@@ -4,7 +4,6 @@ import (
 	"NASP-PROJEKAT/BlockCache"
 	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/SSTable"
-	"NASP-PROJEKAT/data"
 	"NASP-PROJEKAT/memtable"
 	"NASP-PROJEKAT/wal"
 	"encoding/json"
@@ -184,9 +183,9 @@ func main() {
 				fmt.Printf("Error: ", err)
 				return
 			}
-			
+
 			// uzmi records iznad i posalji ih u memtable
-			
+
 			// flushedRecords, flush, err := memtable.Put(record)
 			// if err != nil{
 			// 	panic(err)
@@ -214,11 +213,15 @@ func main() {
 			// }
 
 			// PROBLEM: ne korisitmo isti Record, tj, ti koristis iz data, ja iz wal, mora biti isto
-			var recordPtrs []*data.Record
-			for i := range records {
-				recordPtrs = append(recordPtrs, &records[i])
-			}
-			sst.MakeSSTable(recordPtrs)
+
+			/*
+				var recordPtrs []*data.Record
+				for i := range records {
+					recordPtrs = append(recordPtrs, &records[i])
+				}
+
+			*/
+			sst.MakeSSTable(flushedRecords)
 
 			sst.Index = index
 			sst.Summary = summary
