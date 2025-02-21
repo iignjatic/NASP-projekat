@@ -174,24 +174,9 @@ func main() {
 		} else if input == 2 {
 			//PUT OPERACIJA
 			fmt.Scan(&key, &value)
+			// write to WAL
 			rec := wal.NewRecord(key, []byte(value))
 			w.AddRecord(rec)
-
-			/*
-				writeToWAL
-
-				writeToMEM
-
-				if mem is full{
-
-				flushedRecords, flush, err := memtable.Put(record)
-				if err != nil{
-					panic(err)
-				} else if flush {
-					// flushedRecords je niz pokazivaca za sstable
-				}
-			*/
-			//	sst.MakeSSTable(records)
 
 			numOfSSTables++
 			sst := &SSTable.SSTable{

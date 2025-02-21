@@ -82,7 +82,7 @@ func (w *Wal) SaveRecordToBlock(block *Block, record  *Record, isPadding bool) {
 	}
 	if w.CurrentSegment.IsFull() {
 		w.FlushCurrentSegment()
-		w.HandleFullness(w.CurrentSegment)
+		w.WriteNthByte(w.CurrentSegment, 0)
 		w.AddNewSegment()
 	} else {
 		w.FlushCurrentSegment()
@@ -131,6 +131,11 @@ func (w *Wal) FragmentRecord (block *Block, record *Record) {
 		} else {
 			// otherwise, make the last block the current 
 			block = lastBlock
+			// because of deleting segments that are sent to SSTable, for every two segments that have fragmented records between them, set the second byte to 1(a segment with fragmented record in the end cannot be sent to SSTable and therefore deleted, because the record won't be defragmented successfully, some parts will stay in the next segment, and segment behind won't exist)
+			// here, I know for sure that a new segment is made because fragmentation happened on the segment level
+			// the segment before should have second byte written to 1
+			w.WriteNthByte(w.Segments[len(w.Segments)-2], 1)
+			// the last possible segment that should have the 1 written in the second position is the one with the first record that is the last fragment, this operation should be performed after flushing that segment
 		}
 		
 		// MIDDLE

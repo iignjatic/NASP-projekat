@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-const DIRECTORY_PATH = "../segments"
+const DIRECTORY_PATH = "wal/segments"
 
 type Wal struct {
 	DirectoryPath  string     // directory where Segments are stored
@@ -47,7 +47,7 @@ func (w *Wal) AddNewSegment() {
 	lastSegment = segmentNames[len(segmentNames)-1]
 
 	// check if the last segment is not full by reading the first byte
-	ifFull, err := w.ReadFirstByte(lastSegment)
+	ifFull, err := w.ReadNthByte(lastSegment, 1)
 	if err != nil && ifFull != 0 && ifFull != 1 {
 		err := errors.New("cannot read the first byte")
 		fmt.Println("Error: ", err) 
@@ -115,7 +115,12 @@ func (w *Wal) AddRecord(record *Record) {
 func (w *Wal) FlushCurrentSegment() {
 	if w.CurrentSegment != nil {
 		w.WriteSegmentToFile(w.CurrentSegment)
-		w.CurrentSegment.Transferred = true
+		// if it is the first record in the segment that is the last fragment, change the second byte
+		if len(w.CurrentSegment.Blocks) > 0 && len(w.CurrentSegment.Blocks[0].Records) > 0 {
+			if w.CurrentSegment.Blocks[0].Records[0].Type == 'l' {
+				w.WriteNthByte(w.CurrentSegment, 1)
+			}
+		}
 	}
 }
 
@@ -131,9 +136,9 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 	}
 	defer file.Close()
 
-	// reserve one byte for indicator of fullness of the segment and eight bytes for number of bytes that are pushed on memtable from this segment IF THE SEGMENT IS FULL
-	offset := make([]byte, 9)
-	binary.LittleEndian.PutUint64(offset, 0)
+	// reserve one byte for indicator of fullness of the segment and one byte if the segment is pushed to SSTable IF THE SEGMENT IS FULL
+	offset := make([]byte, 2)
+	binary.LittleEndian.PutUint16(offset, 0)
 	_, err = file.Write(offset)
 	if err != nil {
 		return err
@@ -154,15 +159,15 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 	return nil
 }
 
-// just change the fist byte to one if the segment is full
-func (w *Wal) HandleFullness(s *Segment) error {
+// just change the fist or the second byte to one if the segment is full or if the segment is sent to SSTable
+func (w *Wal) WriteNthByte(s *Segment, n int64) error {
 	file, err := os.OpenFile(w.DirectoryPath + "/" + s.FilePath, os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	_, err = file.Seek(0, io.SeekStart)
+	_, err = file.Seek(n, io.SeekStart)
 	if err != nil {
 		return fmt.Errorf("failed to seek to beginning of the file: %w", err)
 	}
@@ -183,26 +188,9 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 	defer file.Close()
 
 	// move the pointer to the second byte - first byte is for fullness of the file
-	_, err = file.Seek(1, io.SeekStart)
+	_, err = file.Seek(2, io.SeekStart)
 	if err != nil {
-		return nil, fmt.Errorf("failed to seek to first byte: %w", err)
-	}
-	
-	// read offset
-	offsetBytes := make([]byte, 8)
-	_, err = file.Read(offsetBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read offset: %w", err)
-	}
-
-	offset := binary.LittleEndian.Uint64(offsetBytes) // convert offset to uint64
-
-	// set the position to offset
-	if offset != 0 {
-		_, err := file.Seek(int64(offset), io.SeekCurrent)
-		if err != nil {
-			return nil, fmt.Errorf("failed to seek to offset %d: %w", offset, err)
-		}
+		return nil, fmt.Errorf("failed to seek to the second byte: %w", err)
 	}
 
 	var records []*Record
@@ -239,14 +227,14 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 	return records, nil
 }
 
-func (w *Wal) ReadFirstByte(segmentPath string) (byte, error) {
+func (w *Wal) ReadNthByte(segmentPath string, n int) (byte, error) {
 	file, err := os.OpenFile(w.DirectoryPath + "/" + segmentPath, os.O_RDONLY, 0644)
 	if err != nil {
 		return 2, err
 	}
 	defer file.Close()
 
-	buffer := make([]byte, 1)
+	buffer := make([]byte, n)
 	_, err = file.Read(buffer)
 	if err != nil {
 		return 2, fmt.Errorf("failed to read first byte: %w", err)
@@ -308,5 +296,20 @@ func DefragmentRecords(r []*Record) []*Record {
 	return temp
 }
 
-// pad sistema
-// povezi i dodaj funkcionalnost prebacivanja memtabeli i funkcionalnost za mijenjanje onih 8 bajtova kod potvrde sstabele
+func (w *Wal) DeleteSegments(sentToSSTable bool) {
+	segmentNames := w.ReadSegmentNames()
+	if len(segmentNames) != 0 {
+		for _, segment := range segmentNames {
+			ifFull, err := w.ReadNthByte(segment, 1)
+			if err != nil && ifFull != 0 && ifFull != 1 {
+				err := errors.New("cannot read the first byte")
+				fmt.Println("Error: ", err) 
+				return
+			}
+
+			if ifFull == 1 && sentToSSTable {
+				DeleteSegment(w.DirectoryPath + "/" + segment)
+			}
+		}
+	}
+}

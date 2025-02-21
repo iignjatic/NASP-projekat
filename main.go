@@ -67,7 +67,7 @@ func main() {
 	}
 
 	for i:=0; i<len(w.Segments);i++ {
-		fmt.Printf("\n----------------------Segment %d, Transferred: %v----------------------\n", w.Segments[i].ID, w.Segments[i].Transferred)
+		fmt.Printf("\n----------------------Segment %d----------------------\n", w.Segments[i].ID)
 		w.Segments[i].PrintBlocks()
 	}
 	fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
