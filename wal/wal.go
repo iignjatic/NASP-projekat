@@ -296,11 +296,54 @@ func DefragmentRecords(r []*Record) []*Record {
 	return temp
 }
 
+// reading for memtable
+func (w *Wal) ReadSegments() ([]*Record, error) {
+	var allRecords []*Record
+	var segmentsToRead []string
+	segmentNames := w.ReadSegmentNames()
+	if len(segmentNames) != 0 {
+		for _, segmentName := range segmentNames {
+			segmentPath := filepath.Join(w.DirectoryPath, segmentName)
+			// segment(s) will be read if full and if whole records are defragmented from single/multiple segment(s)
+			ifFull, err := w.ReadNthByte(segmentPath, 1)
+			if err != nil && ifFull != 0 && ifFull != 1 {
+				err := errors.New("cannot read the first byte")
+				return nil, err
+			}
+			secondByte, err := w.ReadNthByte(segmentPath, 2)
+			if err != nil && secondByte != 0 && secondByte != 1 {
+				err := errors.New("cannot read the second byte")
+				return nil, err
+			}
+
+			if ifFull == 1 && secondByte == 1 {
+				segmentsToRead = append(segmentsToRead, segmentPath)
+			}
+		}
+	}
+
+	// read the segments 
+	for _, segment := range segmentsToRead {
+		records, err := w.ReadSegmentFromFile(segment)
+		if err != nil {
+			fmt.Printf("Error reading records from segment %s: %v\n", segment, err)
+			continue
+		}
+		allRecords = append(allRecords, records...)
+	}
+
+	noZerosRecords := NoZerosRecords(allRecords)
+	defragmentedRecords := DefragmentRecords(noZerosRecords)
+	return defragmentedRecords, nil
+}
+
+// deleting after sent to sstable
 func (w *Wal) DeleteSegments(sentToSSTable bool) {
 	segmentNames := w.ReadSegmentNames()
 	if len(segmentNames) != 0 {
-		for _, segment := range segmentNames {
-			ifFull, err := w.ReadNthByte(segment, 1)
+		for _, segmentName := range segmentNames {
+			segmentPath := filepath.Join(w.DirectoryPath, segmentName)
+			ifFull, err := w.ReadNthByte(segmentPath, 1)
 			if err != nil && ifFull != 0 && ifFull != 1 {
 				err := errors.New("cannot read the first byte")
 				fmt.Println("Error: ", err) 
@@ -308,7 +351,7 @@ func (w *Wal) DeleteSegments(sentToSSTable bool) {
 			}
 
 			if ifFull == 1 && sentToSSTable {
-				DeleteSegment(w.DirectoryPath + "/" + segment)
+				DeleteSegment(segmentPath)
 			}
 		}
 	}
