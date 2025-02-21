@@ -297,7 +297,7 @@ func DefragmentRecords(r []*Record) []*Record {
 }
 
 // reading for memtable
-func (w *Wal) ReadSegments() ([]*Record, error) {
+func (w *Wal) ReadSegments() ([]*Record, []string, error) {
 	var allRecords []*Record
 	var segmentsToRead []string
 	segmentNames := w.ReadSegmentNames()
@@ -308,12 +308,12 @@ func (w *Wal) ReadSegments() ([]*Record, error) {
 			ifFull, err := w.ReadNthByte(segmentPath, 1)
 			if err != nil && ifFull != 0 && ifFull != 1 {
 				err := errors.New("cannot read the first byte")
-				return nil, err
+				return nil, nil, err
 			}
 			secondByte, err := w.ReadNthByte(segmentPath, 2)
 			if err != nil && secondByte != 0 && secondByte != 1 {
 				err := errors.New("cannot read the second byte")
-				return nil, err
+				return nil, nil, err
 			}
 
 			if ifFull == 1 && secondByte == 1 {
@@ -323,36 +323,26 @@ func (w *Wal) ReadSegments() ([]*Record, error) {
 	}
 
 	// read the segments 
-	for _, segment := range segmentsToRead {
-		records, err := w.ReadSegmentFromFile(segment)
-		if err != nil {
-			fmt.Printf("Error reading records from segment %s: %v\n", segment, err)
-			continue
+	var noZerosRecords []*Record
+	var defragmentedRecords []*Record
+	if len(segmentsToRead) != 0 {
+		for _, segment := range segmentsToRead {
+			records, err := w.ReadSegmentFromFile(segment)
+			if err != nil {
+				fmt.Printf("Error reading records from segment %s: %v\n", segment, err)
+				continue
+			}
+			allRecords = append(allRecords, records...)
 		}
-		allRecords = append(allRecords, records...)
+		noZerosRecords = NoZerosRecords(allRecords)
+		defragmentedRecords = DefragmentRecords(noZerosRecords)
 	}
-
-	noZerosRecords := NoZerosRecords(allRecords)
-	defragmentedRecords := DefragmentRecords(noZerosRecords)
-	return defragmentedRecords, nil
+	return defragmentedRecords, segmentsToRead, nil
 }
 
 // deleting after sent to sstable
-func (w *Wal) DeleteSegments(sentToSSTable bool) {
-	segmentNames := w.ReadSegmentNames()
-	if len(segmentNames) != 0 {
-		for _, segmentName := range segmentNames {
-			segmentPath := filepath.Join(w.DirectoryPath, segmentName)
-			ifFull, err := w.ReadNthByte(segmentPath, 1)
-			if err != nil && ifFull != 0 && ifFull != 1 {
-				err := errors.New("cannot read the first byte")
-				fmt.Println("Error: ", err) 
-				return
-			}
-
-			if ifFull == 1 && sentToSSTable {
-				DeleteSegment(segmentPath)
-			}
-		}
+func DeleteSegments(segmentsToDelete []string, sentToSSTable bool) {
+	for _, segmentPath := range segmentsToDelete {
+		DeleteSegment(segmentPath)
 	}
 }
