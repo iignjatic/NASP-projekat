@@ -120,13 +120,10 @@ func main() {
 				fmt.Println("Zapis je pronadjen : ", string(value))
 				continue
 			}
-			/* if SEARCHMEMTABLE != nil
-				continue
 
-			else if SEARCHCACHE != nil
-				continue
+			// else if SEARCHCACHE != nil
+			// 	continue
 
-			*/
 			for i := numOfSSTables; i > 0; i-- { //prolazak kroz sve sstabele
 				// Kreiranje SSTable-a
 				sst := &SSTable.SSTable{
@@ -178,75 +175,75 @@ func main() {
 			w.AddRecord(rec)
 
 			// read written records if possible
-			// records, segmentsToDelete, err := w.ReadSegments()
-			// if err != nil {
-			// 	fmt.Printf("Error: ", err)
-			// 	return
-			// }
+			records, segmentsToDelete, err := w.ReadSegments()
+			if err != nil {
+				fmt.Printf("Error: ", err)
+				return
+			}
 
 			// uzmi records iznad i posalji ih u memtable
 
-			// flushedRecords, flush, err := memtable.Put(record)
-			// if err != nil{
-			// 	panic(err)
-			// } else if flush {
-			// 	// flushedRecords je niz pokazivaca za sstable
-			// }
+			flushedRecords, flush, err := memtable.Put(record)
+			if err != nil {
+				panic(err)
+			} else if flush {
+				// flushedRecords je niz pokazivaca za sstable
 
-			numOfSSTables++
-			// sst := &SSTable.SSTable{
-			// 	DataSegment:     dataSeg,
-			// 	Index:           index,
-			// 	Summary:         summary,
-			// 	BlockManager:    blockManager,
-			// 	DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
-			// 	IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
-			// 	SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
-			// }
-			// records := []data.Record{
-			// 	{Crc: 12345, KeySize: 4, ValueSize: 5, Key: "key1", Value: []byte("val1"), Tombstone: false, Timestamp: "2024-06-14"},
-			// 	{Crc: 67890, KeySize: 4, ValueSize: 200, Key: "key2", Value: []byte("val2"), Tombstone: true, Timestamp: "2024-06-15"},
-			// 	{Crc: 54321, KeySize: 4, ValueSize: 140, Key: "key3", Value: []byte("val3"), Tombstone: false, Timestamp: "2024-06-16"},
-			// 	{Crc: 12345, KeySize: 4, ValueSize: 5, Key: "key4", Value: []byte("val4"), Tombstone: false, Timestamp: "2024-06-14"},
-			// 	{Crc: 67890, KeySize: 4, ValueSize: 20, Key: "key5", Value: []byte("val5"), Tombstone: true, Timestamp: "2024-06-15"},
-			// 	{Crc: 12345, KeySize: 4, ValueSize: 500, Key: "key6", Value: []byte("val6PERSA PERSIC"), Tombstone: false, Timestamp: "2024-06-14"},
-			// }
-
-			// PROBLEM: ne korisitmo isti Record, tj, ti koristis iz data, ja iz wal, mora biti isto
-
-			/*
-				var recordPtrs []*data.Record
-				for i := range records {
-					recordPtrs = append(recordPtrs, &records[i])
+				numOfSSTables++
+				sst := &SSTable.SSTable{
+					DataSegment:     dataSeg,
+					Index:           index,
+					Summary:         summary,
+					BlockManager:    blockManager,
+					DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
+					IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
+					SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
 				}
 
-			*/
-			// sst.MakeSSTable(flushedRecords)
+				sst.MakeSSTable(flushedRecords)
 
-			// sst.Index = index
-			// sst.Summary = summary
+				sst.Index = index
+				sst.Summary = summary
 
-			// sst.WriteSSTable()
-			// // RECIMO DA JE POSLATO NA SSTABLE
-			// wal.DeleteSegments(segmentsToDelete, true)
+				sst.WriteSSTable()
+				// RECIMO DA JE POSLATO NA SSTABLE
+				wal.DeleteSegments(segmentsToDelete, true)
+			}
 
 		} else if input == 3 {
 
 			//DELETE OPERACIJA
 			fmt.Scan(&key)
 
-			/*
-				writeToWAL
+			//writeToWAL
 
-				updateMEM
-
-				flushedRecords, flush, err := memtable.Delete(record)
-				if err != nil{
-					panic(err)
-				} else if flush {
-					// flushedRecords je niz pokazivaca za sstable
+			flushedRecords, flush, err := memtable.Delete(record)
+			if err != nil {
+				panic(err)
+			} else if flush {
+				// flushedRecords je niz pokazivaca za sstable
+				numOfSSTables++
+				sst := &SSTable.SSTable{
+					DataSegment:     dataSeg,
+					Index:           index,
+					Summary:         summary,
+					BlockManager:    blockManager,
+					DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
+					IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
+					SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
 				}
-			*/
+
+				sst.MakeSSTable(flushedRecords)
+
+				sst.Index = index
+				sst.Summary = summary
+
+				sst.WriteSSTable()
+				// RECIMO DA JE POSLATO NA SSTABLE
+				wal.DeleteSegments(segmentsToDelete, true)
+			}
+
 		}
 	}
+
 }
