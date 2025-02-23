@@ -116,7 +116,7 @@ type DataSegment struct {
 
 func (dataSegment *DataSegment) RecordToBytes(record *data.Record, size uint64, indicator byte) []byte {
 	recordBytes := make([]byte, size)
-	var crc uint64 = record.Crc
+	var crc uint32 = record.Crc
 	var keySize uint64 = record.KeySize
 	var valueSize uint64
 	var value []byte
@@ -131,7 +131,7 @@ func (dataSegment *DataSegment) RecordToBytes(record *data.Record, size uint64, 
 	var tombstone bool = record.Tombstone
 	var timestamp = record.Timestamp
 
-	binary.LittleEndian.PutUint64(recordBytes[0:], crc)
+	binary.LittleEndian.PutUint32(recordBytes[0:], crc)
 	binary.LittleEndian.PutUint64(recordBytes[data.CRC_SIZE:], keySize)
 	binary.LittleEndian.PutUint64(recordBytes[data.CRC_SIZE+data.KEY_SIZE:], valueSize)
 	//recordBytes = append(recordBytes, indicator)

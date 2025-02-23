@@ -4,6 +4,7 @@ import (
 	"NASP-PROJEKAT/BlockCache"
 	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/SSTable"
+	"NASP-PROJEKAT/data"
 	"NASP-PROJEKAT/memtable"
 	"NASP-PROJEKAT/wal"
 	"encoding/json"
@@ -171,7 +172,7 @@ func main() {
 			//PUT OPERACIJA
 			fmt.Scan(&key, &value)
 			// write to WAL
-			rec := wal.NewRecord(key, []byte(value))
+			rec := data.NewRecord(key, []byte(value))
 			w.AddRecord(rec)
 
 			// read written records if possible

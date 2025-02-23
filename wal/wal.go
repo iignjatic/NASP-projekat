@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"NASP-PROJEKAT/data"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -70,7 +71,7 @@ func (w *Wal) AddNewSegment() {
 		w.Segments = append(w.Segments, lastUsedSegment)
 		w.CurrentSegment = lastUsedSegment
 		for _, record := range defragmentedRecords {
-			rec := NewRecord(record.Key, append([]byte{}, record.Value...))
+			rec := data.NewRecord(record.Key, append([]byte{}, record.Value...))
 			if record.Type == 'f' {
 				rec.Type = 'f'
 			} else if record.Type == 'm' {
@@ -108,7 +109,7 @@ func (w *Wal) ReadSegmentNames() []string {
 	return segmentNames
 }
 
-func (w *Wal) AddRecord(record *Record) {
+func (w *Wal) AddRecord(record *data.Record) {
 	w.AddRecordToBlock(record)
 }
 
@@ -180,7 +181,7 @@ func (w *Wal) WriteNthByte(s *Segment, n int64) error {
 }
 
 // a function that reads the whole segment record by record, or from a particular position in the file
-func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
+func (w *Wal) ReadSegmentFromFile(filePath string) ([]*data.Record, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
@@ -193,9 +194,9 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 		return nil, fmt.Errorf("failed to seek to the second byte: %w", err)
 	}
 
-	var records []*Record
+	var records []*data.Record
 	buffer := make([]byte, BLOCK_SIZE)
-	var data []byte
+	var data1 []byte
 
 	for {
 		n, err := file.Read(buffer)
@@ -207,11 +208,11 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 		}
 		
 		// handles leftovers
-		data = append(data, buffer[:n]...)
+		data1 = append(data1, buffer[:n]...)
 
 		i:=0
-		for i<len(data) {
-			record, err := FromBytes(data[i:])
+		for i<len(data1) {
+			record, err := data.FromBytes(data1[i:])
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse record at position %d: %w",i, err)
 			}
@@ -222,7 +223,7 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*Record, error) {
 			}
 			i += len(recordBytes)
 		}
-		data = data[i:]
+		data1 = data1[i:]
 	}
 	return records, nil
 }
@@ -242,8 +243,8 @@ func (w *Wal) ReadNthByte(segmentPath string, n int) (byte, error) {
 	return buffer[0], nil
 }
 
-func (w *Wal) ReadAllSegments() ([]*Record, error) {
-	var allRecords []*Record
+func (w *Wal) ReadAllSegments() ([]*data.Record, error) {
+	var allRecords []*data.Record
 	for _, segmentName := range w.ReadSegmentNames() {
 		segmentPath := filepath.Join(w.DirectoryPath, segmentName)
 
@@ -259,7 +260,7 @@ func (w *Wal) ReadAllSegments() ([]*Record, error) {
 	return defragmentedRecords, nil
 }
 
-func NoZerosRecords(r []*Record) []*Record {
+func NoZerosRecords(r []*data.Record) []*data.Record {
 	for i:=0; i<len(r); i++ {
 		r[i].Value = TrimZeros(r[i].Value)
 		r[i].ValueSize = uint64(len(r[i].Value))
@@ -267,9 +268,9 @@ func NoZerosRecords(r []*Record) []*Record {
 	return r
 }
 
-func DefragmentRecords(r []*Record) []*Record {
-	var temp []*Record 
-	record := NewRecord("", []byte(""))
+func DefragmentRecords(r []*data.Record) []*data.Record {
+	var temp []*data.Record 
+	record := data.NewRecord("", []byte(""))
 	for i:=0; i< len(r); i++ {
 		if r[i].Type == 'a' {
 			temp = append(temp, r[i])
@@ -290,15 +291,15 @@ func DefragmentRecords(r []*Record) []*Record {
 			record.Value = append(record.Value, r[i].Value...)
 			record.ValueSize += r[i].ValueSize
 			temp = append(temp, record)
-			record = NewRecord("", []byte(""))
+			record = data.NewRecord("", []byte(""))
 		}
 	}
 	return temp
 }
 
 // reading for memtable
-func (w *Wal) ReadSegments() ([]*Record, []string, error) {
-	var allRecords []*Record
+func (w *Wal) ReadSegments() ([]*data.Record, []string, error) {
+	var allRecords []*data.Record
 	var segmentsToRead []string
 	segmentNames := w.ReadSegmentNames()
 	if len(segmentNames) != 0 {
@@ -323,8 +324,8 @@ func (w *Wal) ReadSegments() ([]*Record, []string, error) {
 	}
 
 	// read the segments 
-	var noZerosRecords []*Record
-	var defragmentedRecords []*Record
+	var noZerosRecords []*data.Record
+	var defragmentedRecords []*data.Record
 	if len(segmentsToRead) != 0 {
 		for _, segment := range segmentsToRead {
 			records, err := w.ReadSegmentFromFile(segment)

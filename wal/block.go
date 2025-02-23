@@ -1,12 +1,15 @@
 package wal
 
-import "fmt"
+import (
+	"NASP-PROJEKAT/data"
+	"fmt"
+)
 
 const BLOCK_SIZE = 300
 
 type Block struct {
 	ID              int
-	Records         []*Record
+	Records         []*data.Record
 	FullCapacity    uint64
 	CurrentCapacity uint64
 }
@@ -14,16 +17,16 @@ type Block struct {
 func NewBlock(BlockID int) *Block {
 	return &Block{
 		ID:              BlockID,
-		Records:         []*Record{},
+		Records:         []*data.Record{},
 		FullCapacity:    BLOCK_SIZE,
 		CurrentCapacity: 0,
 	}
 }
 
 // before adding a new Record to the Block, it have to be decided which operation should be performed
-func ChosenOperation(currentBlock *Block, record *Record) byte {
+func ChosenOperation(currentBlock *Block, record *data.Record) byte {
 	remainingBlockCapacity := currentBlock.FullCapacity - currentBlock.CurrentCapacity
-	recordFullSize := CalculateRecordSize(record)
+	recordFullSize := data.CalculateRecordSize(record)
 
 	if remainingBlockCapacity == uint64(recordFullSize) {
 		// a Record fits in the Block
@@ -47,7 +50,7 @@ func ChosenOperation(currentBlock *Block, record *Record) byte {
 	}
 }
 
-func (w *Wal) AddRecordToBlock(record *Record) {
+func (w *Wal) AddRecordToBlock(record *data.Record) {
 	currentBlock := w.CurrentSegment.Blocks[len(w.CurrentSegment.Blocks) - 1]
 	chosenOperation := ChosenOperation(currentBlock, record)
 
@@ -72,13 +75,13 @@ func (w *Wal) AddRecordToBlock(record *Record) {
 	}
 }
 
-func (w *Wal) SaveRecordToBlock(block *Block, record  *Record, isPadding bool) {
+func (w *Wal) SaveRecordToBlock(block *Block, record  *data.Record, isPadding bool) {
 	if isPadding {
 		block.Records = append(block.Records, record)
-		block.CurrentCapacity += uint64(CalculateRecordSize(record)) - uint64(len(record.Value)) + record.ValueSize
+		block.CurrentCapacity += uint64(data.CalculateRecordSize(record)) - uint64(len(record.Value)) + record.ValueSize
 	} else {
 		block.Records = append(block.Records, record)
-		block.CurrentCapacity += uint64(CalculateRecordSize(record))
+		block.CurrentCapacity += uint64(data.CalculateRecordSize(record))
 	}
 	if w.CurrentSegment.IsFull() {
 		w.FlushCurrentSegment()
@@ -89,14 +92,14 @@ func (w *Wal) SaveRecordToBlock(block *Block, record  *Record, isPadding bool) {
 	}
 }
 
-func (w *Wal) HandleZeros(block *Block, record *Record) {
+func (w *Wal) HandleZeros(block *Block, record *data.Record) {
 	if len(block.Records) > 0 {
 		lastAddedRecord := block.Records[len(block.Records)-1]
 		lastAddedRecord.Value = TrimZeros(lastAddedRecord.Value)
 		lastAddedRecord.ValueSize = uint64(len(lastAddedRecord.Value))
 	}
 
-	numOfZeros := int64(block.FullCapacity) - int64(CalculateRecordSize(record)) - int64(block.CurrentCapacity) // current capacity is capacity of all records before THIS
+	numOfZeros := int64(block.FullCapacity) - int64(data.CalculateRecordSize(record)) - int64(block.CurrentCapacity) // current capacity is capacity of all records before THIS
 
 	if numOfZeros > 0 {
 		padding := make([]byte, numOfZeros)
@@ -105,8 +108,8 @@ func (w *Wal) HandleZeros(block *Block, record *Record) {
 	}
 }
 
-func (w *Wal) FragmentRecord (block *Block, record *Record) {
-	allButValue := (uint64(CalculateRecordSize(record)) - uint64(len(record.Value)))
+func (w *Wal) FragmentRecord (block *Block, record *data.Record) {
+	allButValue := (uint64(data.CalculateRecordSize(record)) - uint64(len(record.Value)))
 	spaceFirst := block.FullCapacity - block.CurrentCapacity - allButValue
 	// FIRST
 	firstRecord := *record
@@ -173,7 +176,7 @@ func TrimZeros(data []byte) ([]byte) {
 func ReadBlockRecords(block *Block) {
 	records := block.Records
 	for i := 0; i < len(records); i++ {
-		fmt.Printf("Record %d: %v | Size: %d\n", i, records[i], CalculateRecordSize(records[i]))
+		fmt.Printf("Record %d: %v | Size: %d\n", i, records[i], data.CalculateRecordSize(records[i]))
 	}
 }
 

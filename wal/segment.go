@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"NASP-PROJEKAT/data"
 	"fmt"
 	"os"
 )
@@ -44,11 +45,11 @@ func (s *Segment) IsFull() bool {
 // that zeros can appear only in the last records of blocks
 func (s *Segment) BackZeros(i int) uint64 {
 	lastRecord := s.Blocks[i].Records[len(s.Blocks[i].Records) - 1]
-	data := lastRecord.Value
+	data1 := lastRecord.Value
 	zerosCount := 0
-	for len(data) > 0 && data[len(data)-1] == 0 {
+	for len(data1) > 0 && data1[len(data1)-1] == 0 {
 		zerosCount++
-		data = data[:len(data)-1]
+		data1 = data1[:len(data1)-1]
 	}
 
 	if zerosCount == 0 {
@@ -56,7 +57,7 @@ func (s *Segment) BackZeros(i int) uint64 {
 		return 0
 	} else {
 		// one more record can be written - do not count
-		if zerosCount > CalculateRecordSize(lastRecord) - len(lastRecord.Value) {
+		if zerosCount > data.CalculateRecordSize(lastRecord) - len(lastRecord.Value) {
 			return 0
 		} else {
 			// no record can be written in the end of the block
