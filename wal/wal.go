@@ -8,6 +8,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 const DIRECTORY_PATH = "wal/segments"
@@ -31,10 +34,14 @@ func NewWal() *Wal {
 }
 
 func (w *Wal) AddNewSegment() {
-	w.SegmentPaths = w.ReadSegmentNames()
+	segmentNames, err := w.ReadSegmentNames()
+	if err != nil {
+		fmt.Println("Error: ", err)
+		return
+	}
+	w.SegmentPaths = segmentNames
 
 	// get the last segment
-	segmentNames := w.ReadSegmentNames()
 	var lastSegment string
 	if len(segmentNames) == 0 {
 		newSegmentID := len(w.SegmentPaths)
@@ -94,19 +101,39 @@ func (w *Wal) AddNewSegment() {
 	}
 }
 
-func (w *Wal) ReadSegmentNames() []string {
+func (w *Wal) ReadSegmentNames() ([]string, error) {
 	files, err := os.ReadDir(w.DirectoryPath)
 	if err != nil {
-		fmt.Printf("Error reading directory: %v", err)
-		return nil
+		return nil, fmt.Errorf("error reading directory: %v", err)  
 	}
 	var segmentNames []string
-	for i:=0; i<len(files); i++ {
-		if !files[i].IsDir() {
-			segmentNames = append(segmentNames, files[i].Name())
+	for _, file := range files {
+		if !file.IsDir() {
+			segmentName := file.Name()
+			if ExtractSegmentNumber(segmentName) == -1 {
+				return nil, fmt.Errorf("invalid segment name: %s", segmentName)
+			}
+			segmentNames = append(segmentNames, segmentName)
 		}
 	}
-	return segmentNames
+
+	// sort numerically - uses lambda anonymous function
+	sort.Slice(segmentNames, func(i, j int) bool {
+		return ExtractSegmentNumber(segmentNames[i]) < ExtractSegmentNumber(segmentNames[j])
+	})
+
+	return segmentNames, nil
+}
+
+// return number from segment name
+func ExtractSegmentNumber(name string) int {
+	parts := strings.TrimPrefix(name, "wal_")	// starts with wal_
+	parts = strings.TrimSuffix(parts, ".bin") 	// ends with .bin
+	num, err := strconv.Atoi(parts)
+	if err != nil {
+		return -1
+	}
+	return num
 }
 
 func (w *Wal) AddRecord(record *data.Record) {
@@ -245,15 +272,23 @@ func (w *Wal) ReadNthByte(segmentPath string, n int) (byte, error) {
 
 func (w *Wal) ReadAllSegments() ([]*data.Record, error) {
 	var allRecords []*data.Record
-	for _, segmentName := range w.ReadSegmentNames() {
-		segmentPath := filepath.Join(w.DirectoryPath, segmentName)
-
-		records, err := w.ReadSegmentFromFile(segmentPath)
-		if err != nil {
-			fmt.Printf("Error reading records from segment %s: %v\n", segmentPath, err)
-			continue
+	segmentNames, err := w.ReadSegmentNames()
+	if err != nil {
+		return nil, err
+	}
+	if len(segmentNames) != 0 {
+		for _, segmentName := range segmentNames {
+			segmentPath := filepath.Join(w.DirectoryPath, segmentName)
+			// fmt.Println()
+			// fmt.Println(segmentName)
+			// fmt.Println()
+			records, err := w.ReadSegmentFromFile(segmentPath)
+			if err != nil {
+				fmt.Printf("Error reading records from segment %s: %v\n", segmentPath, err)
+				continue
+			}
+			allRecords = append(allRecords, records...)
 		}
-		allRecords = append(allRecords, records...)
 	}
 	noZerosRecords := NoZerosRecords(allRecords)
 	defragmentedRecords := DefragmentRecords(noZerosRecords)
@@ -301,7 +336,10 @@ func DefragmentRecords(r []*data.Record) []*data.Record {
 func (w *Wal) ReadSegments() ([]*data.Record, []string, error) {
 	var allRecords []*data.Record
 	var segmentsToRead []string
-	segmentNames := w.ReadSegmentNames()
+	segmentNames, err := w.ReadSegmentNames()
+	if err != nil {
+		return nil, nil, err
+	}
 	if len(segmentNames) != 0 {
 		for _, segmentName := range segmentNames {
 			segmentPath := filepath.Join(w.DirectoryPath, segmentName)
