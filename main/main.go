@@ -169,27 +169,26 @@ func main() {
 			}
 
 		} else if input == 2 {
-			//PUT OPERACIJA
+			// if segment is not full it cannot be deleted - add remaining number of bytes from the last cycle to the number of bytes added in this cycle 
+			remainder, err := w.ReadRemainder()
+			if err != nil {
+				panic(err)
+			}
+			// put
 			fmt.Scan(&key, &value)
+
 			// write to WAL
 			rec := data.NewRecord(key, []byte(value))
 			w.AddRecord(rec)
 
-			// read written records if possible
-			records, segmentsToDelete, err := w.ReadSegments()
-			if err != nil {
-				fmt.Printf("Error: ", err)
-				return
-			}
-
-			// uzmi records iznad i posalji ih u memtable
-
-			flushedRecords, flush, err := memtable.Put(record)
+			// write to MemTable
+			flushedRecords, flush, err := memtable.Put(rec)
+			fmt.Println(flush)
 			if err != nil {
 				panic(err)
 			} else if flush {
+				fmt.Println("dsadasdadasdasdasd")
 				// flushedRecords je niz pokazivaca za sstable
-
 				numOfSSTables++
 				sst := &SSTable.SSTable{
 					DataSegment:     dataSeg,
@@ -202,47 +201,48 @@ func main() {
 				}
 
 				sst.MakeSSTable(flushedRecords)
-
 				sst.Index = index
 				sst.Summary = summary
-
 				sst.WriteSSTable()
-				// RECIMO DA JE POSLATO NA SSTABLE
-				wal.DeleteSegments(segmentsToDelete, true)
-			}
 
+				numberOfBytesSent := wal.NumberOfBytesSent(flushedRecords) + remainder
+				err := w.DeleteSegments(numberOfBytesSent)
+				if err != nil {
+					panic(err)
+				}
+			}
 		} else if input == 3 {
 
-			//DELETE OPERACIJA
-			fmt.Scan(&key)
+	// 		//DELETE OPERACIJA
+	// 		fmt.Scan(&key)
 
-			//writeToWAL
+	// 		//writeToWAL
 
-			flushedRecords, flush, err := memtable.Delete(record)
-			if err != nil {
-				panic(err)
-			} else if flush {
-				// flushedRecords je niz pokazivaca za sstable
-				numOfSSTables++
-				sst := &SSTable.SSTable{
-					DataSegment:     dataSeg,
-					Index:           index,
-					Summary:         summary,
-					BlockManager:    blockManager,
-					DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
-					IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
-					SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
-				}
+	// 		flushedRecords, flush, err := memtable.Delete(record)
+	// 		if err != nil {
+	// 			panic(err)
+	// 		} else if flush {
+	// 			// flushedRecords je niz pokazivaca za sstable
+	// 			numOfSSTables++
+	// 			sst := &SSTable.SSTable{
+	// 				DataSegment:     dataSeg,
+	// 				Index:           index,
+	// 				Summary:         summary,
+	// 				BlockManager:    blockManager,
+	// 				DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
+	// 				IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
+	// 				SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
+	// 			}
 
-				sst.MakeSSTable(flushedRecords)
+	// 			sst.MakeSSTable(flushedRecords)
 
-				sst.Index = index
-				sst.Summary = summary
+	// 			sst.Index = index
+	// 			sst.Summary = summary
 
-				sst.WriteSSTable()
-				// RECIMO DA JE POSLATO NA SSTABLE
-				wal.DeleteSegments(segmentsToDelete, true)
-			}
+	// 			sst.WriteSSTable()
+	// 			// RECIMO DA JE POSLATO NA SSTABLE
+	// 			wal.DeleteSegments(segmentsToDelete, true)
+	// 		}
 
 		}
 	}
