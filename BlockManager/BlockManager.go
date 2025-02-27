@@ -46,8 +46,8 @@ func (blockManager *BlockManager) WriteBlock(block *data.Block, filePath string,
 
 func (BlockManager *BlockManager) ReadBlock(filePath string, numberOfBlock uint64, indicator byte, metaSummary int64) ([]byte, error) {
 	var buffer []byte
-	if BlockManager.BlockCache.CheckCache(strconv.Itoa(int(numberOfBlock))+string(indicator)) != nil {
-		buffer = BlockManager.BlockCache.BlockMap[strconv.Itoa(int(numberOfBlock))+string(indicator)].Block.Records
+	if BlockManager.BlockCache.CheckCache(strconv.Itoa(int(numberOfBlock))+filePath) != nil {
+		buffer = BlockManager.BlockCache.BlockMap[strconv.Itoa(int(numberOfBlock))+filePath].Block.Records
 	} else {
 		file, err := os.OpenFile(filePath, os.O_RDONLY, 0666)
 		if err != nil {
@@ -66,7 +66,7 @@ func (BlockManager *BlockManager) ReadBlock(filePath string, numberOfBlock uint6
 		block := &data.Block{
 			Records: buffer,
 		}
-		BlockManager.BlockCache.AddCache(strconv.Itoa(int(numberOfBlock))+string(indicator), block)
+		BlockManager.BlockCache.AddCache(strconv.Itoa(int(numberOfBlock))+filePath, block)
 	}
 	return buffer, nil
 }
