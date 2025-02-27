@@ -13,10 +13,12 @@ import (
 	"strings"
 )
 
-const DIRECTORY_PATH = "wal/segments"
+const DIRECTORY_PATH = "../wal/segments"
+const HELPER_PATH = "wal/helper"
 
 type Wal struct {
 	DirectoryPath  string     // directory where Segments are stored
+	HelperPath		string
 	Segments       []*Segment // array of Segments that are not saved
 	CurrentSegment *Segment   // current active segment
 	SegmentPaths   []string   // list of all segment paths
@@ -25,6 +27,7 @@ type Wal struct {
 func NewWal() *Wal {
 	w := &Wal{
 		DirectoryPath:  DIRECTORY_PATH,
+		HelperPath: HELPER_PATH,
 		Segments:       []*Segment{},
 		CurrentSegment: nil,
 		SegmentPaths:   []string{},
@@ -44,7 +47,7 @@ func (w *Wal) AddNewSegment() {
 	// get the last segment
 	var lastSegment string
 	if len(segmentNames) == 0 {
-		newSegmentID := len(w.SegmentPaths)
+		newSegmentID := len(segmentNames)
 		newSegment := NewSegment(newSegmentID)
 		w.Segments = append(w.Segments, newSegment)
 		w.CurrentSegment = newSegment
@@ -55,7 +58,7 @@ func (w *Wal) AddNewSegment() {
 	lastSegment = segmentNames[len(segmentNames)-1]
 
 	// check if the last segment is not full by reading the first byte
-	ifFull, err := w.ReadNthByte(lastSegment, 1)
+	ifFull, err := w.ReadFirstByte(lastSegment)
 	if err != nil && ifFull != 0 && ifFull != 1 {
 		err := errors.New("cannot read the first byte")
 		fmt.Println("Error: ", err) 
@@ -74,6 +77,7 @@ func (w *Wal) AddNewSegment() {
 		defragmentedRecords := DefragmentRecords(noZerosRecords)
 
 		// create the segment and add records to it
+		// last := w.SegmentPaths[len(w.SegmentPaths)-1]
 		lastUsedSegment := NewSegment(len(w.SegmentPaths)-1)
 		w.Segments = append(w.Segments, lastUsedSegment)
 		w.CurrentSegment = lastUsedSegment
@@ -92,7 +96,8 @@ func (w *Wal) AddNewSegment() {
 		}
 		// w.CurrentSegment.PrintBlocks()
 	} else {
-		newSegmentID := len(w.SegmentPaths)
+		last := w.SegmentPaths[len(w.SegmentPaths)-1]
+		newSegmentID := ExtractSegmentNumber(last) + 1
 		newSegment := NewSegment(newSegmentID)
 		w.Segments = append(w.Segments, newSegment)
 		w.CurrentSegment = newSegment
@@ -143,12 +148,6 @@ func (w *Wal) AddRecord(record *data.Record) {
 func (w *Wal) FlushCurrentSegment() {
 	if w.CurrentSegment != nil {
 		w.WriteSegmentToFile(w.CurrentSegment)
-		// if it is the first record in the segment that is the last fragment, change the second byte
-		if len(w.CurrentSegment.Blocks) > 0 && len(w.CurrentSegment.Blocks[0].Records) > 0 {
-			if w.CurrentSegment.Blocks[0].Records[0].Type == 'l' {
-				w.WriteNthByte(w.CurrentSegment, 1)
-			}
-		}
 	}
 }
 
@@ -164,9 +163,8 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 	}
 	defer file.Close()
 
-	// reserve one byte for indicator of fullness of the segment and one byte if the segment is pushed to SSTable IF THE SEGMENT IS FULL
-	offset := make([]byte, 2)
-	binary.LittleEndian.PutUint16(offset, 0)
+	// reserve one byte for indicator of fullness of the segment
+	offset := []byte{0}
 	_, err = file.Write(offset)
 	if err != nil {
 		return err
@@ -188,14 +186,14 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 }
 
 // just change the fist or the second byte to one if the segment is full or if the segment is sent to SSTable
-func (w *Wal) WriteNthByte(s *Segment, n int64) error {
+func (w *Wal) WriteFirstByte(s *Segment) error {
 	file, err := os.OpenFile(w.DirectoryPath + "/" + s.FilePath, os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	_, err = file.Seek(n, io.SeekStart)
+	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
 		return fmt.Errorf("failed to seek to beginning of the file: %w", err)
 	}
@@ -215,10 +213,10 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*data.Record, error) {
 	}
 	defer file.Close()
 
-	// move the pointer to the second byte - first byte is for fullness of the file
-	_, err = file.Seek(2, io.SeekStart)
+	// move the pointer to the first byte - first byte is for fullness of the file
+	_, err = file.Seek(1, io.SeekStart)
 	if err != nil {
-		return nil, fmt.Errorf("failed to seek to the second byte: %w", err)
+		return nil, fmt.Errorf("failed to seek to the first byte: %w", err)
 	}
 
 	var records []*data.Record
@@ -255,14 +253,14 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*data.Record, error) {
 	return records, nil
 }
 
-func (w *Wal) ReadNthByte(segmentPath string, n int) (byte, error) {
+func (w *Wal) ReadFirstByte(segmentPath string) (byte, error) {
 	file, err := os.OpenFile(w.DirectoryPath + "/" + segmentPath, os.O_RDONLY, 0644)
 	if err != nil {
 		return 2, err
 	}
 	defer file.Close()
 
-	buffer := make([]byte, n)
+	buffer := make([]byte, 1)
 	_, err = file.Read(buffer)
 	if err != nil {
 		return 2, fmt.Errorf("failed to read first byte: %w", err)
@@ -270,6 +268,7 @@ func (w *Wal) ReadNthByte(segmentPath string, n int) (byte, error) {
 	return buffer[0], nil
 }
 
+// for testing functionality of segmentation
 func (w *Wal) ReadAllSegments() ([]*data.Record, error) {
 	var allRecords []*data.Record
 	segmentNames, err := w.ReadSegmentNames()
@@ -279,9 +278,6 @@ func (w *Wal) ReadAllSegments() ([]*data.Record, error) {
 	if len(segmentNames) != 0 {
 		for _, segmentName := range segmentNames {
 			segmentPath := filepath.Join(w.DirectoryPath, segmentName)
-			// fmt.Println()
-			// fmt.Println(segmentName)
-			// fmt.Println()
 			records, err := w.ReadSegmentFromFile(segmentPath)
 			if err != nil {
 				fmt.Printf("Error reading records from segment %s: %v\n", segmentPath, err)
@@ -332,56 +328,77 @@ func DefragmentRecords(r []*data.Record) []*data.Record {
 	return temp
 }
 
-// reading for memtable
-func (w *Wal) ReadSegments() ([]*data.Record, []string, error) {
-	var allRecords []*data.Record
-	var segmentsToRead []string
-	segmentNames, err := w.ReadSegmentNames()
-	if err != nil {
-		return nil, nil, err
+// calculates the number of bytes sent to SSTable
+func NumberOfBytesSent(records []*data.Record) int {
+	var numberOfBytesSent int = 0
+	for _, r := range records {
+		numberOfBytesSent += data.CalculateRecordSize(r)
 	}
-	if len(segmentNames) != 0 {
-		for _, segmentName := range segmentNames {
-			segmentPath := filepath.Join(w.DirectoryPath, segmentName)
-			// segment(s) will be read if full and if whole records are defragmented from single/multiple segment(s)
-			ifFull, err := w.ReadNthByte(segmentPath, 1)
-			if err != nil && ifFull != 0 && ifFull != 1 {
-				err := errors.New("cannot read the first byte")
-				return nil, nil, err
-			}
-			secondByte, err := w.ReadNthByte(segmentPath, 2)
-			if err != nil && secondByte != 0 && secondByte != 1 {
-				err := errors.New("cannot read the second byte")
-				return nil, nil, err
-			}
-
-			if ifFull == 1 && secondByte == 1 {
-				segmentsToRead = append(segmentsToRead, segmentPath)
-			}
-		}
-	}
-
-	// read the segments 
-	var noZerosRecords []*data.Record
-	var defragmentedRecords []*data.Record
-	if len(segmentsToRead) != 0 {
-		for _, segment := range segmentsToRead {
-			records, err := w.ReadSegmentFromFile(segment)
-			if err != nil {
-				fmt.Printf("Error reading records from segment %s: %v\n", segment, err)
-				continue
-			}
-			allRecords = append(allRecords, records...)
-		}
-		noZerosRecords = NoZerosRecords(allRecords)
-		defragmentedRecords = DefragmentRecords(noZerosRecords)
-	}
-	return defragmentedRecords, segmentsToRead, nil
+	return numberOfBytesSent
 }
 
-// deleting after sent to sstable
-func DeleteSegments(segmentsToDelete []string, sentToSSTable bool) {
-	for _, segmentPath := range segmentsToDelete {
+// deleting after sent to SSTable
+func (w *Wal) DeleteSegments(numberOfBytesSent int) error {
+	segmentNames, err := w.ReadSegmentNames()
+	if err != nil {
+		return err
+	}
+	if len(segmentNames) == 0 { 
+		return nil
+	}
+	// calculate the number of segments that have to be deleted
+	numberOfSegmentsToDelete := numberOfBytesSent / (SEGMENT_SIZE + 1)
+	remainder := numberOfBytesSent % (SEGMENT_SIZE + 1)
+
+	// delete segments
+	for i:=0; i < numberOfSegmentsToDelete; i++ {
+		segmentPath := w.DirectoryPath + "/" + segmentNames[i]
 		DeleteSegment(segmentPath)
 	}
+
+	// if there is the remainder, save it for system crush
+	if remainder > 0 {
+		err := w.SaveRemainder(remainder)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (w *Wal) SaveRemainder(remainder int) error {
+	file, err := os.Create(w.HelperPath + "/remainder.bin")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buffer, uint32(remainder))
+
+	_, err = file.Write(buffer)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w *Wal) ReadRemainder() (int, error) {
+	file, err := os.Open(w.HelperPath + "/remainder.bin")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 4)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return 0, err
+	}
+
+	remainder := int(binary.LittleEndian.Uint32(buffer))
+	return remainder, nil
 }
