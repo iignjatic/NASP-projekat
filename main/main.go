@@ -174,6 +174,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+
 			// put
 			fmt.Scan(&key, &value)
 
@@ -183,11 +184,9 @@ func main() {
 
 			// write to MemTable
 			flushedRecords, flush, err := memtable.Put(rec)
-			fmt.Println(flush)
 			if err != nil {
 				panic(err)
 			} else if flush {
-				fmt.Println("dsadasdadasdasdasd")
 				// flushedRecords je niz pokazivaca za sstable
 				numOfSSTables++
 				sst := &SSTable.SSTable{
