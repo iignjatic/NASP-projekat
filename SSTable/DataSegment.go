@@ -1,6 +1,7 @@
 package SSTable
 
 import (
+	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/data"
 	"encoding/binary"
 )
@@ -9,6 +10,24 @@ type DataSegment struct {
 	Blocks       []*data.Block
 	SegmentSize  uint64
 	DataFilePath string
+	BlockManager BlockManager.BlockManager
+}
+
+func (dataSegment *DataSegment) BlocksToMerkle(fileName string) []*data.Block {
+	var numBlock uint32 = 0
+	var blocks []*data.Block
+	var buffer []byte
+	var err error
+	buffer, err = dataSegment.BlockManager.ReadBlock(fileName, uint64(numBlock), 'a', 0)
+	for err == nil && buffer != nil {
+		block := &data.Block{
+			Records: buffer,
+		}
+		blocks = append(blocks, block)
+		numBlock++
+		buffer, err = dataSegment.BlockManager.ReadBlock(fileName, uint64(numBlock), 'a', 0)
+	}
+	return blocks
 }
 
 // func (dataSegment *DataSegment) MakeSegment(records []*data.Record) {

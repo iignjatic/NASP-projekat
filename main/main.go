@@ -89,7 +89,9 @@ func main() {
 	blockManager := &BlockManager.BlockManager{
 		BlockCache: *blockCache,
 	}
-	dataSeg := &SSTable.DataSegment{}
+	dataSeg := &SSTable.DataSegment{
+		BlockManager: *blockManager,
+	}
 	index := &SSTable.Index{}
 	summary := &SSTable.Summary{
 		Sample: SUMMARY_SAMPLE,
