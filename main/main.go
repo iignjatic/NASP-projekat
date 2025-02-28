@@ -188,6 +188,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			} else if flush {
+				fmt.Println("dsadasasds")
 				// flushedRecords je niz pokazivaca za sstable
 				numOfSSTables++
 				sst := &SSTable.SSTable{
