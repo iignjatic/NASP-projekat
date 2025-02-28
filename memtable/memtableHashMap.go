@@ -156,7 +156,10 @@ func (mm *MemtableManagerHM) Put(record *data.Record) ([]*data.Record, bool, err
 			flushedRecords = rec
 		}
 	}
-
+	// ako se nesto nalazi u flushedRecords znaci da se treba uraditi flush
+	if flushedRecords != nil {
+		return flushedRecords, true, nil
+	}
 	return flushedRecords, true, nil
 }
 

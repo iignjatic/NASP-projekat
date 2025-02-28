@@ -78,11 +78,6 @@ func main() {
 
 	w := wal.NewWal()
 
-	dataSeg := &SSTable.DataSegment{}
-	index := &SSTable.Index{}
-	summary := &SSTable.Summary{
-		Sample: SUMMARY_SAMPLE,
-	}
 	LRUlist := &BlockCache.LRUlist{}
 	blockMap := make(map[string]*BlockCache.BlockNode)
 	blockCache := &BlockCache.BlockCache{
@@ -90,8 +85,14 @@ func main() {
 		Capacity: 10,
 		BlockMap: blockMap,
 	}
+
 	blockManager := &BlockManager.BlockManager{
 		BlockCache: *blockCache,
+	}
+	dataSeg := &SSTable.DataSegment{}
+	index := &SSTable.Index{}
+	summary := &SSTable.Summary{
+		Sample: SUMMARY_SAMPLE,
 	}
 
 	files, _ := ioutil.ReadDir("../SSTable/files")
@@ -169,7 +170,7 @@ func main() {
 			}
 
 		} else if input == 2 {
-			// if segment is not full it cannot be deleted - add remaining number of bytes from the last cycle to the number of bytes added in this cycle 
+			// if segment is not full it cannot be deleted - add remaining number of bytes from the last cycle to the number of bytes added in this cycle
 			remainder, err := w.ReadRemainder()
 			if err != nil {
 				panic(err)
@@ -212,36 +213,36 @@ func main() {
 			}
 		} else if input == 3 {
 
-	// 		//DELETE OPERACIJA
-	// 		fmt.Scan(&key)
+			// 		//DELETE OPERACIJA
+			// 		fmt.Scan(&key)
 
-	// 		//writeToWAL
+			// 		//writeToWAL
 
-	// 		flushedRecords, flush, err := memtable.Delete(record)
-	// 		if err != nil {
-	// 			panic(err)
-	// 		} else if flush {
-	// 			// flushedRecords je niz pokazivaca za sstable
-	// 			numOfSSTables++
-	// 			sst := &SSTable.SSTable{
-	// 				DataSegment:     dataSeg,
-	// 				Index:           index,
-	// 				Summary:         summary,
-	// 				BlockManager:    blockManager,
-	// 				DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
-	// 				IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
-	// 				SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
-	// 			}
+			// 		flushedRecords, flush, err := memtable.Delete(record)
+			// 		if err != nil {
+			// 			panic(err)
+			// 		} else if flush {
+			// 			// flushedRecords je niz pokazivaca za sstable
+			// 			numOfSSTables++
+			// 			sst := &SSTable.SSTable{
+			// 				DataSegment:     dataSeg,
+			// 				Index:           index,
+			// 				Summary:         summary,
+			// 				BlockManager:    blockManager,
+			// 				DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
+			// 				IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
+			// 				SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
+			// 			}
 
-	// 			sst.MakeSSTable(flushedRecords)
+			// 			sst.MakeSSTable(flushedRecords)
 
-	// 			sst.Index = index
-	// 			sst.Summary = summary
+			// 			sst.Index = index
+			// 			sst.Summary = summary
 
-	// 			sst.WriteSSTable()
-	// 			// RECIMO DA JE POSLATO NA SSTABLE
-	// 			wal.DeleteSegments(segmentsToDelete, true)
-	// 		}
+			// 			sst.WriteSSTable()
+			// 			// RECIMO DA JE POSLATO NA SSTABLE
+			// 			wal.DeleteSegments(segmentsToDelete, true)
+			// 		}
 
 		}
 	}
