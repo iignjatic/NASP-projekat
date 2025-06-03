@@ -415,7 +415,7 @@ func (w *Wal) DeleteFullyFlushedSegments(flushedRecords []*data.Record) error {
 	for _, rec := range flushedRecords {
 		segID, ok := w.RecordToSegment[rec]
 		if !ok {
-			continue // možda nije u WAL-u (unlikely)
+			continue
 		}
 		segmentFlushCount[segID]++
 	}
@@ -427,10 +427,10 @@ func (w *Wal) DeleteFullyFlushedSegments(flushedRecords []*data.Record) error {
 			path := filepath.Join(w.DirectoryPath, segmentFile)
 			err := os.Remove(path)
 			if err != nil {
-				fmt.Printf("Greška pri brisanju segmenta %s: %v\n", segmentFile, err)
+				fmt.Printf("Error deleting segment %s: %v\n", segmentFile, err)
 				continue
 			}
-			fmt.Printf("Segment %d uspešno obrisan.\n", segmentID)
+			fmt.Printf("Segment %d successfully deleted.\n", segmentID)
 			delete(w.SegmentRecordCount, segmentID)
 		}
 	}
