@@ -27,8 +27,8 @@ type Config struct {
 func main() {
 	//DEFAULT VRIJEDNOSTI KONFIGURACIJE
 	var BLOCK_SIZE uint64 = 70
-	var MEMTABLE_SIZE uint64 = 30
-	var MEMTABLE_COUNT uint64 = 2
+	var MEMTABLE_SIZE uint64 = 5
+	var MEMTABLE_COUNT uint64 = 1
 	var MEMTABLE_TYPE string = "hashmap"
 	//var CACHE_SIZE uint32 = 10
 	var SUMMARY_SAMPLE uint64 = 5
@@ -172,12 +172,6 @@ func main() {
 			}
 
 		} else if input == 2 {
-			// if segment is not full it cannot be deleted - add remaining number of bytes from the last cycle to the number of bytes added in this cycle
-			remainder, err := w.ReadRemainder()
-			if err != nil {
-				panic(err)
-			}
-
 			// put
 			fmt.Scan(&key, &value)
 
@@ -187,6 +181,7 @@ func main() {
 
 			// write to MemTable
 			flushedRecords, flush, err := memtable.Put(rec)
+			fmt.Println(flush)
 			if err != nil {
 				panic(err)
 			} else if flush {
@@ -208,12 +203,26 @@ func main() {
 				sst.Summary = summary
 				sst.WriteSSTable()
 
-				numberOfBytesSent := wal.NumberOfBytesSent(flushedRecords) + remainder
-				err := w.DeleteSegments(numberOfBytesSent)
+				err := w.DeleteFullyFlushedSegments(flushedRecords)
 				if err != nil {
 					panic(err)
 				}
 			}
+			for i:=0; i<len(w.Segments);i++ {
+				fmt.Printf("\n----------------------Segment %d----------------------\n", w.Segments[i].ID)
+				w.Segments[i].PrintBlocks()
+			}
+			fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+			fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
+			defragmentedRecords, err := w.ReadAllSegments()
+			if err != nil {
+				fmt.Printf("Segment deserialization failed: %v\n", err)
+				return
+			}
+			for i:=0; i<len(defragmentedRecords); i++ {
+				fmt.Println(defragmentedRecords[i])
+			}
+		
 		} else if input == 3 {
 
 			// 		//DELETE OPERACIJA

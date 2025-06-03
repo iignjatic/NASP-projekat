@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-const BLOCK_SIZE = 300
+const BLOCK_SIZE = 70
 
 type Block struct {
 	ID              int

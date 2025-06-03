@@ -33,7 +33,7 @@ func (s *Segment) IsFull() bool {
 	usedCapacity := uint64(0)
 	for i:=0;i<len(s.Blocks);i++ {
 		if len(s.Blocks[i].Records) > 0 {
-			usedCapacity += s.Blocks[i].CurrentCapacity + s.BackZeros(i)
+			usedCapacity += s.Blocks[i].CurrentCapacity
 		}
 	}
 	// println(usedCapacity)

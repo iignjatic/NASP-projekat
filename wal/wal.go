@@ -22,6 +22,8 @@ type Wal struct {
 	Segments       []*Segment // array of Segments that are not saved
 	CurrentSegment *Segment   // current active segment
 	SegmentPaths   []string   // list of all segment paths
+	SegmentRecordCount map[int]int
+	RecordToSegment    map[*data.Record]int
 }
 
 func NewWal() *Wal {
@@ -31,6 +33,8 @@ func NewWal() *Wal {
 		Segments:       []*Segment{},
 		CurrentSegment: nil,
 		SegmentPaths:   []string{},
+		SegmentRecordCount: make(map[int]int),
+		RecordToSegment:    make(map[*data.Record]int),
 	}
 	w.AddNewSegment()
 	return w
@@ -142,6 +146,8 @@ func ExtractSegmentNumber(name string) int {
 }
 
 func (w *Wal) AddRecord(record *data.Record) {
+	w.RecordToSegment[record] = w.CurrentSegment.ID
+	w.SegmentRecordCount[w.CurrentSegment.ID]++
 	w.AddRecordToBlock(record)
 }
 
@@ -401,4 +407,32 @@ func (w *Wal) ReadRemainder() (int, error) {
 
 	remainder := int(binary.LittleEndian.Uint32(buffer))
 	return remainder, nil
+}
+
+func (w *Wal) DeleteFullyFlushedSegments(flushedRecords []*data.Record) error {
+	segmentFlushCount := make(map[int]int)
+
+	for _, rec := range flushedRecords {
+		segID, ok := w.RecordToSegment[rec]
+		if !ok {
+			continue // možda nije u WAL-u (unlikely)
+		}
+		segmentFlushCount[segID]++
+	}
+
+	for segmentID, flushed := range segmentFlushCount {
+		total := w.SegmentRecordCount[segmentID]
+		if flushed == total {
+			segmentFile := fmt.Sprintf("wal_%d.bin", segmentID)
+			path := filepath.Join(w.DirectoryPath, segmentFile)
+			err := os.Remove(path)
+			if err != nil {
+				fmt.Printf("Greška pri brisanju segmenta %s: %v\n", segmentFile, err)
+				continue
+			}
+			fmt.Printf("Segment %d uspešno obrisan.\n", segmentID)
+			delete(w.SegmentRecordCount, segmentID)
+		}
+	}
+	return nil
 }

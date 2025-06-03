@@ -1,7 +1,7 @@
 {
   "BlockSize": 70,
-  "MemTableSize": 30,
-  "MemTableCount": 2,
+  "MemTableSize": 5,
+  "MemTableCount": 1,
   "MemTableType": "hashmap",
   "CacheSize": 10,
   "SummarySample": 5
