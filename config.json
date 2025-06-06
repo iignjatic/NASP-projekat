@@ -1,5 +1,5 @@
 {
-  "BlockSize": 70,
+  "BlockSize": 32,
   "MemTableSize": 5,
   "MemTableCount": 1,
   "MemTableType": "hashmap",

@@ -26,7 +26,7 @@ type Config struct {
 
 func main() {
 	//DEFAULT VRIJEDNOSTI KONFIGURACIJE
-	var BLOCK_SIZE uint64 = 70
+	var BLOCK_SIZE uint64 = 32
 	var MEMTABLE_SIZE uint64 = 5
 	var MEMTABLE_COUNT uint64 = 1
 	var MEMTABLE_TYPE string = "hashmap"
@@ -88,6 +88,7 @@ func main() {
 
 	blockManager := &BlockManager.BlockManager{
 		BlockCache: *blockCache,
+		BlockSize:  BLOCK_SIZE,
 	}
 	dataSeg := &SSTable.DataSegment{
 		BlockManager: *blockManager,
@@ -98,7 +99,7 @@ func main() {
 	}
 
 	files, _ := ioutil.ReadDir("../SSTable/files")
-	numOfSSTables := len(files) / 3
+	numOfSSTables := len(files)
 
 	var input uint32
 	var key string
@@ -135,9 +136,10 @@ func main() {
 					Index:           index,
 					Summary:         summary,
 					BlockManager:    blockManager,
-					DataFilePath:    "../SSTable/files/data" + strconv.Itoa(i) + ".bin",
-					IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(i) + ".bin",
-					SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(i) + ".bin",
+					DataFilePath:    "../SSTable/files/sstable_" + strconv.Itoa(i) + "/data" + strconv.Itoa(i) + ".bin",
+					IndexFilePath:   "../SSTable/files/sstable_" + strconv.Itoa(i) + "/index" + strconv.Itoa(i) + ".bin",
+					SummaryFilePath: "../SSTable/files/sstable_" + strconv.Itoa(i) + "/summary" + strconv.Itoa(i) + ".bin",
+					BlockSize:       BLOCK_SIZE,
 				}
 				summarySize, err := os.Stat(sst.SummaryFilePath)
 				if err != nil {
@@ -177,7 +179,7 @@ func main() {
 
 			// write to WAL
 			rec := data.NewRecord(key, []byte(value))
-			w.AddRecord(rec)
+			//	w.AddRecord(rec)
 
 			// write to MemTable
 			flushedRecords, flush, err := memtable.Put(rec)
@@ -188,14 +190,24 @@ func main() {
 				fmt.Println("dsadasasds")
 				// flushedRecords je niz pokazivaca za sstable
 				numOfSSTables++
+				newSSTable := "sstable_" + strconv.Itoa(numOfSSTables)
+				sstPath := "../SSTable/files/" + newSSTable
+
+				err := os.MkdirAll(sstPath, 0755)
+				if err != nil {
+					fmt.Println("Error creating folder:", err)
+					return
+				}
+
 				sst := &SSTable.SSTable{
 					DataSegment:     dataSeg,
 					Index:           index,
 					Summary:         summary,
 					BlockManager:    blockManager,
-					DataFilePath:    "../SSTable/files/data" + strconv.Itoa(numOfSSTables) + ".bin",
-					IndexFilePath:   "../SSTable/files/index" + strconv.Itoa(numOfSSTables) + ".bin",
-					SummaryFilePath: "../SSTable/files/summary" + strconv.Itoa(numOfSSTables) + ".bin",
+					DataFilePath:    "../SSTable/files/" + newSSTable + "/data" + strconv.Itoa(numOfSSTables) + ".bin",
+					IndexFilePath:   "../SSTable/files/" + newSSTable + "/index" + strconv.Itoa(numOfSSTables) + ".bin",
+					SummaryFilePath: "../SSTable/files/" + newSSTable + "/summary" + strconv.Itoa(numOfSSTables) + ".bin",
+					BlockSize:       BLOCK_SIZE,
 				}
 
 				sst.MakeSSTable(flushedRecords)
@@ -203,12 +215,12 @@ func main() {
 				sst.Summary = summary
 				sst.WriteSSTable()
 
-				err := w.DeleteFullyFlushedSegments(flushedRecords)
+				//	err := w.DeleteFullyFlushedSegments(flushedRecords)
 				if err != nil {
 					panic(err)
 				}
 			}
-			for i:=0; i<len(w.Segments);i++ {
+			for i := 0; i < len(w.Segments); i++ {
 				fmt.Printf("\n----------------------Segment %d----------------------\n", w.Segments[i].ID)
 				w.Segments[i].PrintBlocks()
 			}
@@ -219,10 +231,10 @@ func main() {
 				fmt.Printf("Segment deserialization failed: %v\n", err)
 				return
 			}
-			for i:=0; i<len(defragmentedRecords); i++ {
+			for i := 0; i < len(defragmentedRecords); i++ {
 				fmt.Println(defragmentedRecords[i])
 			}
-		
+
 		} else if input == 3 {
 
 			// 		//DELETE OPERACIJA

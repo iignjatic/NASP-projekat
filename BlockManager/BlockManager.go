@@ -9,6 +9,7 @@ import (
 
 type BlockManager struct {
 	BlockCache BlockCache.BlockCache
+	BlockSize  uint64
 }
 
 //func (blockManager *BlockManager) writeBlock(block *Block, filePath string, numberOfBlock uint32) {
@@ -55,8 +56,8 @@ func (BlockManager *BlockManager) ReadBlock(filePath string, numberOfBlock uint6
 		}
 		defer file.Close()
 
-		buffer = make([]byte, data.BlockSize) //u bafer ce biti ucitani podaci koje vraca funkcija
-		offset := int64(numberOfBlock)*int64(data.BlockSize) + int64(metaSummary)
+		buffer = make([]byte, BlockManager.BlockSize) //u bafer ce biti ucitani podaci koje vraca funkcija
+		offset := int64(numberOfBlock)*int64(BlockManager.BlockSize) + int64(metaSummary)
 		_, err = file.ReadAt(buffer, offset)
 		//readAt cita onoliko bajtova koliko moze da stane u bafer a to je velicina jednog bloka
 		//cita sa pozicije u datoteci koja je drugi parametar funkcije
