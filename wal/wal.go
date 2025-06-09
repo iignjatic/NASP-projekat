@@ -2,7 +2,7 @@ package wal
 
 import (
 	"NASP-PROJEKAT/data"
-	"encoding/binary"
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -14,28 +14,22 @@ import (
 )
 
 const DIRECTORY_PATH = "../wal/segments"
-const HELPER_PATH = "wal/helper"
 
 type Wal struct {
 	DirectoryPath  string     // directory where Segments are stored
-	HelperPath		string
 	Segments       []*Segment // array of Segments that are not saved
 	CurrentSegment *Segment   // current active segment
 	SegmentPaths   []string   // list of all segment paths
-	SegmentRecordCount map[int]int
-	RecordToSegment    map[*data.Record]int
 }
 
 func NewWal() *Wal {
 	w := &Wal{
 		DirectoryPath:  DIRECTORY_PATH,
-		HelperPath: HELPER_PATH,
 		Segments:       []*Segment{},
 		CurrentSegment: nil,
 		SegmentPaths:   []string{},
-		SegmentRecordCount: make(map[int]int),
-		RecordToSegment:    make(map[*data.Record]int),
 	}
+
 	w.AddNewSegment()
 	return w
 }
@@ -145,10 +139,12 @@ func ExtractSegmentNumber(name string) int {
 	return num
 }
 
-func (w *Wal) AddRecord(record *data.Record) {
-	w.RecordToSegment[record] = w.CurrentSegment.ID
-	w.SegmentRecordCount[w.CurrentSegment.ID]++
-	w.AddRecordToBlock(record)
+func (w *Wal) AddRecord(record *data.Record) []*data.Record {
+	var records []*data.Record
+	// w.RecordToSegment[record] = w.CurrentSegment.ID
+	// w.SegmentRecordCount[w.CurrentSegment.ID]++
+	records = w.AddRecordToBlock(record)
+	return records 
 }
 
 func (w *Wal) FlushCurrentSegment() {
@@ -243,6 +239,9 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*data.Record, error) {
 
 		i:=0
 		for i<len(data1) {
+			if isAllZeros(data1[i:]) {
+				return records, nil
+			}
 			record, err := data.FromBytes(data1[i:])
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse record at position %d: %w",i, err)
@@ -257,6 +256,15 @@ func (w *Wal) ReadSegmentFromFile(filePath string) ([]*data.Record, error) {
 		data1 = data1[i:]
 	}
 	return records, nil
+}
+
+func isAllZeros(data []byte) bool {
+	for _, b := range data {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func (w *Wal) ReadFirstByte(segmentPath string) (byte, error) {
@@ -334,105 +342,164 @@ func DefragmentRecords(r []*data.Record) []*data.Record {
 	return temp
 }
 
-// calculates the number of bytes sent to SSTable
-func NumberOfBytesSent(records []*data.Record) int {
-	var numberOfBytesSent int = 0
-	for _, r := range records {
-		numberOfBytesSent += data.CalculateRecordSize(r)
-	}
-	return numberOfBytesSent
-}
-
-// deleting after sent to SSTable
-func (w *Wal) DeleteSegments(numberOfBytesSent int) error {
-	segmentNames, err := w.ReadSegmentNames()
+// Function to write two numbers to the first and second lines of the file
+func WriteNumbersToFile(filename string, number1 int, number2 int) error {
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
-	if len(segmentNames) == 0 { 
-		return nil
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
 	}
-	// calculate the number of segments that have to be deleted
-	numberOfSegmentsToDelete := numberOfBytesSent / (SEGMENT_SIZE + 1)
-	remainder := numberOfBytesSent % (SEGMENT_SIZE + 1)
-
-	// delete segments
-	for i:=0; i < numberOfSegmentsToDelete; i++ {
-		segmentPath := w.DirectoryPath + "/" + segmentNames[i]
-		DeleteSegment(segmentPath)
+	// Ensure there are at least two lines in the file
+	if len(lines) < 2 {
+		lines = append(lines, "", "") // Add two empty lines if they don't exist
 	}
-
-	// if there is the remainder, save it for system crush
-	if remainder > 0 {
-		err := w.SaveRemainder(remainder)
+	// Write numbers to the first and second lines
+	lines[0] = fmt.Sprintf("%d", number1) // First line
+	lines[1] = fmt.Sprintf("%d", number2) // Second line
+	// Rewrite the entire file
+	file.Truncate(0)
+	file.Seek(0, 0)
+	writer := bufio.NewWriter(file)
+	for _, line := range lines {
+		_, err := writer.WriteString(line + "\n")
 		if err != nil {
 			return err
 		}
 	}
+	writer.Flush()
 	return nil
 }
 
-func (w *Wal) SaveRemainder(remainder int) error {
-	file, err := os.Create(w.HelperPath + "/remainder.bin")
+// Function to read two numbers from the first and second lines of the file
+func ReadNumbersFromFile(filename string) (int, int, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	// Ensure that there are at least two lines in the file
+	if len(lines) < 2 {
+		return 0, 0, fmt.Errorf("file does not contain enough lines")
+	}
+	// Parse the numbers from the first and second lines
+	number1, err := strconv.Atoi(lines[0])
+	if err != nil {
+		return 0, 0, err
+	}
+	number2, err := strconv.Atoi(lines[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	return number1, number2, nil
+}
+
+func (w *Wal) DeleteFullyFlushedSegments(bytesStart int, bytesEnd int) error {
+	segmentNames, err := w.ReadSegmentNames()
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-
-	buffer := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buffer, uint32(remainder))
-
-	_, err = file.Write(buffer)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (w *Wal) ReadRemainder() (int, error) {
-	file, err := os.Open(w.HelperPath + "/remainder.bin")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	defer file.Close()
-
-	buffer := make([]byte, 4)
-	_, err = file.Read(buffer)
-	if err != nil {
-		return 0, err
-	}
-
-	remainder := int(binary.LittleEndian.Uint32(buffer))
-	return remainder, nil
-}
-
-func (w *Wal) DeleteFullyFlushedSegments(flushedRecords []*data.Record) error {
-	segmentFlushCount := make(map[int]int)
-
-	for _, rec := range flushedRecords {
-		segID, ok := w.RecordToSegment[rec]
-		if !ok {
+	for _, segmentName := range segmentNames {
+		segmentIndex := ExtractSegmentNumber(segmentName)
+		segmentStart := segmentIndex * SEGMENT_SIZE
+		segmentEnd := segmentStart + SEGMENT_SIZE
+		// Delete fully included segments within the range
+		if segmentStart >= bytesStart && segmentEnd <= bytesEnd {
+			// Delete the segment
+			err := w.DeleteSegment(segmentIndex)
+			if err != nil {
+				return err
+			}
 			continue
 		}
-		segmentFlushCount[segID]++
-	}
-
-	for segmentID, flushed := range segmentFlushCount {
-		total := w.SegmentRecordCount[segmentID]
-		if flushed == total {
-			segmentFile := fmt.Sprintf("wal_%d.bin", segmentID)
-			path := filepath.Join(w.DirectoryPath, segmentFile)
-			err := os.Remove(path)
+		// If the last segment is partially included, check if it has data
+		if segmentEnd > bytesEnd {
+			// Check the remaining part of the last segment (if there is a remainder, check if it's empty)
+			remainingBytesStart := bytesEnd
+			remainingBytesEnd := segmentEnd
+			hasData, err := w.HasDataInSegment(segmentName, remainingBytesStart, remainingBytesEnd)
 			if err != nil {
-				fmt.Printf("Error deleting segment %s: %v\n", segmentFile, err)
-				continue
+				return err
 			}
-			fmt.Printf("Segment %d successfully deleted.\n", segmentID)
-			delete(w.SegmentRecordCount, segmentID)
+			if !hasData {
+				// If no data, delete the segment
+				err := w.DeleteSegment(ExtractSegmentNumber(segmentName))
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
+	ok, err := w.IsDirectoryEmpty() 
+	if err != nil {
+		panic(err)
+	}
+	if ok {
+		w.Segments = []*Segment{}
+		w.CurrentSegment = nil
+		w.SegmentPaths = []string{}
+		w.AddNewSegment()
+	} 
 	return nil
 }
+
+// DeleteSegment deletes the segment file based on its ID.
+func (w *Wal) DeleteSegment(segmentID int) error {
+	segmentFile := fmt.Sprintf("wal_%d.bin", segmentID)
+	path := filepath.Join(w.DirectoryPath, segmentFile)
+	err := os.Remove(path)
+	if err != nil {
+		fmt.Printf("Error deleting segment %s: %v\n", segmentFile, err)
+		return err
+	}
+	fmt.Printf("Segment %d successfully deleted.\n", segmentID)
+	return nil
+}
+
+func (w *Wal) HasDataInSegment(segmentName string, bytesStart int, bytesEnd int) (bool, error) {
+	path := filepath.Join(w.DirectoryPath, segmentName)
+	file, err := os.Open(path)
+	if err != nil {
+		return false, fmt.Errorf("error opening segment %s: %v", segmentName, err)
+	}
+	defer file.Close()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return false, fmt.Errorf("error getting file info for %s: %v", segmentName, err)
+	}
+	if fileInfo.Size() <= int64(bytesEnd) {
+		return false, nil // No data after bytesEnd
+	}
+	return true, nil
+}
+
+func (w *Wal) IsDirectoryEmpty() (bool, error) {
+	dir, err := os.Open(w.DirectoryPath)
+	if err != nil {
+		return false, fmt.Errorf("error opening directory %s: %v", w.DirectoryPath, err)
+	}
+	defer dir.Close()
+	files, err := dir.Readdirnames(0) // 0 means to read all files
+	if err != nil {
+		return false, fmt.Errorf("error reading directory %s: %v", w.DirectoryPath, err)
+	}
+	return len(files) == 0, nil
+}
+
+
+func CalculateRecordsSize(r []*data.Record) int {
+	var sum int
+	for _, rec := range r {
+		sum += data.CalculateRecordSize(rec)
+	}
+	return sum
+} 

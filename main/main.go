@@ -26,7 +26,7 @@ type Config struct {
 
 func main() {
 	//DEFAULT VRIJEDNOSTI KONFIGURACIJE
-	var BLOCK_SIZE uint64 = 32
+	var BLOCK_SIZE uint64 = 70
 	var MEMTABLE_SIZE uint64 = 5
 	var MEMTABLE_COUNT uint64 = 1
 	var MEMTABLE_TYPE string = "hashmap"
@@ -104,6 +104,18 @@ func main() {
 	var input uint32
 	var key string
 	var value []byte
+	var tempRecords []*data.Record
+	recs, err := w.ReadAllSegments()
+	if err != nil {
+		fmt.Printf("Segment deserialization failed: %v\n", err)
+		return
+	}
+
+	_, err = memtable.LoadFromWal(recs)
+	if err != nil {
+		fmt.Println("Greška pri učitavanju podataka u MemTable:", err)
+		return
+	}
 
 	for {
 		fmt.Println(" * KEY - VALUE ENGINE * ")
@@ -179,15 +191,24 @@ func main() {
 
 			// write to WAL
 			rec := data.NewRecord(key, []byte(value))
-			//	w.AddRecord(rec)
+			w.AddRecord(rec)
 
 			// write to MemTable
 			flushedRecords, flush, err := memtable.Put(rec)
 			fmt.Println(flush)
+
+			if len(flushedRecords) > 0 {
+				for i, record := range flushedRecords {
+					fmt.Printf("Element %d: %+v\n", i, record)
+				}
+			} else {
+				fmt.Printf("Prazan niz")
+			}
+
 			if err != nil {
 				panic(err)
 			} else if flush {
-				fmt.Println("dsadasasds")
+				wal.WriteNumbersToFile("../wal/walhelper.txt", 0, wal.CalculateRecordsSize(tempRecords))
 				// flushedRecords je niz pokazivaca za sstable
 				numOfSSTables++
 				newSSTable := "sstable_" + strconv.Itoa(numOfSSTables)
@@ -215,10 +236,12 @@ func main() {
 				sst.Summary = summary
 				sst.WriteSSTable()
 
-				//	err := w.DeleteFullyFlushedSegments(flushedRecords)
+				err := w.DeleteFullyFlushedSegments(flushedRecords)
 				if err != nil {
 					panic(err)
 				}
+				tempRecords = nil
+				wal.WriteNumbersToFile("../wal/walhelper.txt", 0, 0)
 			}
 			for i := 0; i < len(w.Segments); i++ {
 				fmt.Printf("\n----------------------Segment %d----------------------\n", w.Segments[i].ID)

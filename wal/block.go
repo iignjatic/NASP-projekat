@@ -50,7 +50,8 @@ func ChosenOperation(currentBlock *Block, record *data.Record) byte {
 	}
 }
 
-func (w *Wal) AddRecordToBlock(record *data.Record) {
+func (w *Wal) AddRecordToBlock(record *data.Record) []*data.Record {
+	var records []*data.Record
 	currentBlock := w.CurrentSegment.Blocks[len(w.CurrentSegment.Blocks) - 1]
 	chosenOperation := ChosenOperation(currentBlock, record)
 
@@ -66,13 +67,14 @@ func (w *Wal) AddRecordToBlock(record *data.Record) {
 		w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
 		w.HandleZeros(newBlock, record)
 	case 'f':
-		w.FragmentRecord(currentBlock, record)
+		records = w.FragmentRecord(currentBlock, record)
 	case 'u':
 		newBlockID := currentBlock.ID + 1
 		newBlock := NewBlock(newBlockID)
 		w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
-		w.FragmentRecord(newBlock, record)
+		records = w.FragmentRecord(newBlock, record)
 	}
+	return records
 }
 
 func (w *Wal) SaveRecordToBlock(block *Block, record  *data.Record, isPadding bool) {
@@ -108,7 +110,8 @@ func (w *Wal) HandleZeros(block *Block, record *data.Record) {
 	}
 }
 
-func (w *Wal) FragmentRecord (block *Block, record *data.Record) {
+func (w *Wal) FragmentRecord (block *Block, record *data.Record) ([]*data.Record) {
+	var fragments []*data.Record
 	allButValue := (uint64(data.CalculateRecordSize(record)) - uint64(len(record.Value)))
 	spaceFirst := block.FullCapacity - block.CurrentCapacity - allButValue
 	// FIRST
@@ -117,6 +120,7 @@ func (w *Wal) FragmentRecord (block *Block, record *data.Record) {
 	copy(firstRecord.Value, record.Value[:spaceFirst])
 	firstRecord.ValueSize = spaceFirst
 	firstRecord.Type = 'f'
+	fragments = append(fragments, &firstRecord)
 	w.HandleZeros(block, &firstRecord)
 	w.SaveRecordToBlock(block, &firstRecord, false)
 	
@@ -144,6 +148,7 @@ func (w *Wal) FragmentRecord (block *Block, record *data.Record) {
 			copy(middleRecord.Value, remainingValue[:spaceMiddle])
 			middleRecord.ValueSize = spaceMiddle
 			middleRecord.Type = 'm'
+			fragments = append(fragments, &middleRecord)
 			w.SaveRecordToBlock(block, &middleRecord, false)
 
 			remainingValue = remainingValue[spaceMiddle:]
@@ -155,10 +160,12 @@ func (w *Wal) FragmentRecord (block *Block, record *data.Record) {
 			copy(lastRecord.Value, remainingValue)
 			lastRecord.ValueSize = remainingSize
 			lastRecord.Type = 'l'
+			fragments = append(fragments, &lastRecord)
 			w.HandleZeros(block, &lastRecord)
 			remainingSize = 0
 		}
 	}
+	return fragments
 }
 
 func TrimZeros(data []byte) ([]byte) {
