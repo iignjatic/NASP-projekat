@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 )
@@ -32,7 +31,7 @@ type TokenBucket struct {
 //
 // kao argunemti se prosleđuju maksimalan broj tokena i interval resetovanja tokena
 // vracam pokazivac na novi TokenBucket
-func newTokenBucket(maxTokens int64, resetInteval int64) *TokenBucket {
+func NewTokenBucket(maxTokens int64, resetInteval int64) *TokenBucket {
 	return &TokenBucket{
 		maximumTokens:         maxTokens,
 		currentNumberOfTokens: maxTokens,
@@ -43,20 +42,20 @@ func newTokenBucket(maxTokens int64, resetInteval int64) *TokenBucket {
 
 // resetTokens resetuje broj tokena na maksimalan broj i postavlja vrijeme posljednjeg resetovanja na trenutno vrijeme
 // prima TokenBucket kao argument
-func (tokenB *TokenBucket) resetTokens() {
+func (tokenB *TokenBucket) ResetTokens() {
 	tokenB.currentNumberOfTokens = tokenB.maximumTokens
 	tokenB.lastTimeReset = Now()
 }
 
 // getTokens uzima tokene iz TokenBucketa
 // kao argumente prima TokenBucket
-func (tokenB *TokenBucket) getTokens() error {
+func (tokenB *TokenBucket) GetTokens() error {
 	tokenB.mu.Lock()
 	defer tokenB.mu.Unlock()
 
 	// Provjerava se da li je proslo dovoljno vremena kako bi se tokeni resetovali
 	if IsPast(tokenB.lastTimeReset + tokenB.resetInterval) {
-		tokenB.resetTokens()
+		tokenB.ResetTokens()
 	}
 
 	// Ako je broj tokena 0, vraca se greska
@@ -119,75 +118,75 @@ func (t *TokenBucket) DeserializeState(data []byte) error {
 	return nil
 }
 
-// SaveState cuva stanje TokenBucketa u binarni fajl
-func (t *TokenBucket) SaveState(fileName string) error {
-	data, err := t.SerializeState()
-	if err != nil {
-		return fmt.Errorf("greska prilikom serijalizacije: %v", err)
-	}
+// // SaveState cuva stanje TokenBucketa u binarni fajl
+// func (t *TokenBucket) SaveState(fileName string) error {
+// 	data, err := t.SerializeState()
+// 	if err != nil {
+// 		return fmt.Errorf("greska prilikom serijalizacije: %v", err)
+// 	}
 
-	err = os.WriteFile(fileName, data, 0644)
-	if err != nil {
-		return fmt.Errorf("greska prilikom cuvanja u fajl: %v", err)
-	}
+// 	err = os.WriteFile(fileName, data, 0644)
+// 	if err != nil {
+// 		return fmt.Errorf("greska prilikom cuvanja u fajl: %v", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-// LoadState ucitava stanje TokenBucketa iz binarnog fajla
-func (t *TokenBucket) LoadState(fileName string) error {
-	data, err := os.ReadFile(fileName)
-	if err != nil {
-		return fmt.Errorf("greska prilikom učitavanja fajla: %v", err)
-	}
+// // LoadState ucitava stanje TokenBucketa iz binarnog fajla
+// func (t *TokenBucket) LoadState(fileName string) error {
+// 	data, err := os.ReadFile(fileName)
+// 	if err != nil {
+// 		return fmt.Errorf("greska prilikom ucitavanja fajla: %v", err)
+// 	}
 
-	err = t.DeserializeState(data)
-	if err != nil {
-		return fmt.Errorf("greska prilikom deserijalizacije: %v", err)
-	}
+// 	err = t.DeserializeState(data)
+// 	if err != nil {
+// 		return fmt.Errorf("greska prilikom deserijalizacije: %v", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func main() {
+// func main() {
 
-	tb := newTokenBucket(10, 30)
+// 	tb := newTokenBucket(10, 30)
 
-	fmt.Println("Testiranje uzimanja tokena:")
-	for i := 0; i < 12; i++ {
-		err := tb.getTokens()
-		if err != nil {
-			fmt.Printf("Greska prilikom uzimanja tokena: %v\n", err)
-		} else {
-			fmt.Printf("Uspijesno uzet token! Preostali tokeni: %d\n", tb.currentNumberOfTokens)
-		}
-		time.Sleep(2 * time.Second)
-	}
+// 	fmt.Println("Testiranje uzimanja tokena:")
+// 	for i := 0; i < 12; i++ {
+// 		err := tb.getTokens()
+// 		if err != nil {
+// 			fmt.Printf("Greska prilikom uzimanja tokena: %v\n", err)
+// 		} else {
+// 			fmt.Printf("Uspijesno uzet token! Preostali tokeni: %d\n", tb.currentNumberOfTokens)
+// 		}
+// 		time.Sleep(2 * time.Second)
+// 	}
 
-	err := tb.SaveState("token_bucket_state.bin")
-	if err != nil {
-		fmt.Println("Greška prilikom cuvanja stanja:", err)
-	} else {
-		fmt.Println("Stanje uspijesno sacuvano u fajl.")
-	}
+// 	err := tb.SaveState("token_bucket_state.bin")
+// 	if err != nil {
+// 		fmt.Println("Greška prilikom cuvanja stanja:", err)
+// 	} else {
+// 		fmt.Println("Stanje uspijesno sacuvano u fajl.")
+// 	}
 
-	newTB := &TokenBucket{}
-	err = newTB.LoadState("token_bucket_state.bin")
-	if err != nil {
-		fmt.Println("Greska prilikom ucitavanja stanja:", err)
-	} else {
-		fmt.Println("Stanje uspijesno ucitano iz fajla.")
-	}
+// 	newTB := &TokenBucket{}
+// 	err = newTB.LoadState("token_bucket_state.bin")
+// 	if err != nil {
+// 		fmt.Println("Greska prilikom ucitavanja stanja:", err)
+// 	} else {
+// 		fmt.Println("Stanje uspijesno ucitano iz fajla.")
+// 	}
 
-	fmt.Println("\nTestiranje resetovanja tokena:")
+// 	fmt.Println("\nTestiranje resetovanja tokena:")
 
-	time.Sleep(35 * time.Second)
+// 	time.Sleep(35 * time.Second)
 
-	err = newTB.getTokens()
-	if err != nil {
-		fmt.Printf("Greska prilikom uzimanja tokena: %v\n", err)
-	} else {
-		fmt.Printf("Uspijesno uzet token! Preostali tokeni: %d\n", newTB.currentNumberOfTokens)
-	}
+// 	err = newTB.getTokens()
+// 	if err != nil {
+// 		fmt.Printf("Greska prilikom uzimanja tokena: %v\n", err)
+// 	} else {
+// 		fmt.Printf("Uspijesno uzet token! Preostali tokeni: %d\n", newTB.currentNumberOfTokens)
+// 	}
 
-}
+// }

@@ -4,5 +4,8 @@
   "MemTableCount": 1,
   "MemTableType": "hashmap",
   "CacheSize": 10,
-  "SummarySample": 5
+  "SummarySample": 5,
+  "MaxTokens": 10,
+  "ResetInterval": 30
+
 }
