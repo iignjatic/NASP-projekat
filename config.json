@@ -1,5 +1,5 @@
 {
-  "BlockSize": 70,
+  "BlockSize": 64,
   "BlocksPerSegment": 4,
   "MemTableSize": 3,
   "MemTableCount": 2,
