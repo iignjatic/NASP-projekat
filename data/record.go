@@ -27,7 +27,7 @@ const (
 
 /*
    +---------------+-----------------+---------------+------+---------------+----------+-------+-...-+--...--+
-   |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Type | Key Size (8B) | Value Size (8B) | Key | Value |
+   |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Type(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
    +---------------+-----------------+---------------+------+---------------+----------+-------+-...-+--...--+
    CRC = 32bit hash computed over the payload using CRC
    Key Size = Length of the Key data
@@ -52,7 +52,7 @@ type Record struct {
 
 func NewRecord(key string, value []byte) *Record {
 	timestamp := fmt.Sprintf("%d", time.Now().UTC().Unix())
-	return &Record{
+	rec := &Record{
 		Crc:       0, // computed during serialization
 		Timestamp: timestamp,
 		Tombstone: false, // default value
@@ -62,6 +62,8 @@ func NewRecord(key string, value []byte) *Record {
 		Key:       key,
 		Value:     value,
 	}
+	rec.ToBytes()
+	return rec
 }
 
 func CRC32(data []byte) uint32 {
@@ -212,4 +214,24 @@ func TrimZeros(data []byte) ([]byte) {
 		data = data[:len(data)-1]
 	}
 	return data
+}
+
+func DeepCopyRecord(original *Record) *Record {
+	if original == nil {
+		return nil
+	}
+
+	copyValue := make([]byte, len(original.Value))
+	copy(copyValue, original.Value)
+
+	return &Record{
+		Crc:       original.Crc,
+		Timestamp: original.Timestamp,
+		Tombstone: original.Tombstone,
+		Type:      original.Type,
+		KeySize:   original.KeySize,
+		ValueSize: original.ValueSize,
+		Key:       original.Key,
+		Value:     copyValue,
+	}
 }
