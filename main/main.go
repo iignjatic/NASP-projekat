@@ -91,6 +91,7 @@ func main() {
 
 	blockManager := &BlockManager.BlockManager{
 		BlockCache: *blockCache,
+		BlockSize: BLOCK_SIZE,
 	}
 	dataSeg := &SSTable.DataSegment{
 		BlockManager: *blockManager,
@@ -108,7 +109,7 @@ func main() {
 	var value []byte
 
 
-	w := wal.NewWal(BLOCK_SIZE, BLOCKS_PER_SEGMENT)
+	w := wal.NewWal(blockManager, BLOCK_SIZE, BLOCKS_PER_SEGMENT)
 
 	// OBRIŠI prethodne kompletno flushovane WAL segmente
 	flushInfos, err := wal.LoadFlushInfoFromFile()

@@ -3,6 +3,8 @@ package BlockManager
 import (
 	"NASP-PROJEKAT/BlockCache"
 	"NASP-PROJEKAT/data"
+	"fmt"
+	"io"
 	"os"
 	"strconv"
 )
@@ -70,4 +72,46 @@ func (BlockManager *BlockManager) ReadBlock(filePath string, numberOfBlock uint6
 		BlockManager.BlockCache.AddCache(strconv.Itoa(int(numberOfBlock))+filePath, block)
 	}
 	return buffer, nil
+}
+
+func (bm *BlockManager) WriteIndicatorByte(filePath string, indicator byte) error {
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.WriteAt([]byte{indicator}, 0)
+	return err
+}
+
+func (bm *BlockManager) ReadIndicatorByte(filePath string) (byte, error) {
+	file, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+	buffer := make([]byte, 1)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return 0, err
+	}
+	return buffer[0], nil
+}
+
+func (blockManager *BlockManager) ReadWalBlock(filePath string, numberOfBlock uint64, indicatorSize int64) ([]byte, error) {
+	buffer := make([]byte, blockManager.BlockSize)
+	offset := int64(numberOfBlock)*int64(blockManager.BlockSize) + indicatorSize
+	file, err := os.OpenFile(filePath, os.O_RDONLY, 0666)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+	bytesRead, err := file.ReadAt(buffer, offset)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("failed to read block: %w", err)
+	}
+	if bytesRead == 0 {
+		return nil, io.EOF
+	}
+	return buffer[:bytesRead], nil
 }

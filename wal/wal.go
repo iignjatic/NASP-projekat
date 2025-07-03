@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/data"
 	"encoding/binary"
 	"errors"
@@ -34,9 +35,10 @@ type Wal struct {
 	recordPositions map[FragmentKey][]Position
 	blockSize         uint64
 	blocksPerSegment  uint64
+	blockManager *BlockManager.BlockManager
 }
 
-func NewWal(blockSize, blocksPerSegment uint64) *Wal {
+func NewWal(bm *BlockManager.BlockManager, blockSize, blocksPerSegment uint64) *Wal {
 	w := &Wal{
 		DirectoryPath:  DIRECTORY_PATH,
 		Segments:       []*Segment{},
@@ -45,6 +47,7 @@ func NewWal(blockSize, blocksPerSegment uint64) *Wal {
 		recordPositions: make(map[FragmentKey][]Position),
 		blockSize: blockSize,
 		blocksPerSegment: blocksPerSegment,
+		blockManager: bm,
 	}
 
 	w.AddNewSegment()
@@ -177,46 +180,30 @@ func (w *Wal) FlushCurrentSegment() {
 
 // a function that writes records to the segment file
 func (w *Wal) WriteSegmentToFile(s *Segment) error {
-	if err := os.MkdirAll(w.DirectoryPath, os.ModePerm); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
 	filePath := w.DirectoryPath + "/" + s.FilePath
-	file, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// reserve one byte for indicator of fullness of the segment
-	currentOffset := 1
-	offset := []byte{0}
-	_, err = file.Write(offset)
-	if err != nil {
-		return err
-	}
 
 	if w.recordPositions == nil {
 		w.recordPositions = make(map[FragmentKey][]Position)
 	}
 
-	for i:=0;i<len(s.Blocks);i++ {
-		for j:=0;j<len(s.Blocks[i].Records);j++ {
-			rec := s.Blocks[i].Records[j]
+	indicatorSize := uint64(1)
+	currentOffset := int(indicatorSize)
 
+	for i, walBlock := range s.Blocks {
+		dataBlock, err := ConvertWalBlockToDataBlock(walBlock)
+		if err != nil {
+			return fmt.Errorf("failed to convert wal block to data block: %w", err)
+		}
+
+		w.blockManager.WriteBlock(dataBlock, filePath, uint64(i), w.blockSize, indicatorSize)
+
+		for _, rec := range walBlock.Records {
 			recordBytes, err := rec.ToBytes()
 			if err != nil {
-				return err
-			}
-			_, err = file.Write(recordBytes)
-			if err != nil {
-				return err
+				return fmt.Errorf("failed to serialize record: %w", err)
 			}
 
-			// write positions
-			key := FragmentKey{
-				Key: rec.Key,
-				Timestamp: rec.Timestamp,
-			}
+			key := FragmentKey{Key: rec.Key, Timestamp: rec.Timestamp}
 			pos := Position{
 				SegmentID: s.ID,
 				Offset:    currentOffset,
@@ -229,60 +216,48 @@ func (w *Wal) WriteSegmentToFile(s *Segment) error {
 	return nil
 }
 
-// just change the fist or the second byte to one if the segment is full or if the segment is sent to SSTable
 func (w *Wal) WriteFirstByte(s *Segment) error {
-	file, err := os.OpenFile(w.DirectoryPath + "/" + s.FilePath, os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+	filePath := w.DirectoryPath + "/" + s.FilePath
+	return w.blockManager.WriteIndicatorByte(filePath, 1)
+}
 
-	_, err = file.Seek(0, io.SeekStart)
-	if err != nil {
-		return fmt.Errorf("failed to seek to beginning of the file: %w", err)
+func ConvertWalBlockToDataBlock(wb *Block) (*data.Block, error) {
+	var allBytes []byte
+	for _, rec := range wb.Records {
+		b, err := rec.ToBytes()
+		if err != nil {
+			return nil, err
+		}
+		allBytes = append(allBytes, b...)
 	}
-	offset := []byte{1}
-	_, err = file.Write(offset)
-	if err != nil {
-		return err
-	}
-	return nil
+	return &data.Block{Records: allBytes}, nil
 }
 
 // a function that reads the segment record by record
 func (w *Wal) ReadSegmentFromFile(filePath string, offset int64, useCheckpoint bool, revoked bool) ([]*data.Record, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
-	}
-	defer file.Close()
-
 	if !useCheckpoint {
 		offset = 1
 	}
 
 	segmentID := ExtractSegmentNumber(filepath.Base(filePath))
 
-	// move the pointer to the first byte - first byte is for fullness of the file
-	_, err = file.Seek(offset, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("failed to seek to the first byte: %w", err)
-	}
-
 	var records []*data.Record
-	buffer := make([]byte, w.blockSize)
 	var data1 []byte
 	currentOffset := int(offset)
 
-	for {
-		n, err := file.Read(buffer)
+	indicatorSize := int64(1)
+	startBlock := offset / int64(w.blockSize)
+
+	for blockNum := startBlock; ; blockNum++ {
+		buffer, err := w.blockManager.ReadWalBlock(filePath, uint64(blockNum), indicatorSize)
 		if err != nil && err != io.EOF {
 			return nil, fmt.Errorf("failed to read file: %w", err)
 		}
+
+		n:=len(buffer)
 		if n == 0 {
 			break
 		}
-		
 		// handles leftovers
 		data1 = append(data1, buffer[:n]...)
 
@@ -341,18 +316,8 @@ func (w *Wal) ReadSegmentFromFile(filePath string, offset int64, useCheckpoint b
 }
 
 func (w *Wal) ReadFirstByte(segmentPath string) (byte, error) {
-	file, err := os.OpenFile(w.DirectoryPath + "/" + segmentPath, os.O_RDONLY, 0644)
-	if err != nil {
-		return 2, err
-	}
-	defer file.Close()
-
-	buffer := make([]byte, 1)
-	_, err = file.Read(buffer)
-	if err != nil {
-		return 2, fmt.Errorf("failed to read first byte: %w", err)
-	}
-	return buffer[0], nil
+	filePath := w.DirectoryPath + "/" + segmentPath
+	return w.blockManager.ReadIndicatorByte(filePath)
 }
 
 func (w *Wal) ReadAllSegmentsCP(rev bool) ([]*data.Record, error) {
