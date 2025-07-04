@@ -336,15 +336,15 @@ func (w *Wal) ReadAllSegmentsCP(rev bool) ([]*data.Record, error) {
 		segmentID := ExtractSegmentNumber(segmentName)
 		segmentPath := filepath.Join(w.DirectoryPath, segmentName)
 
-		if segmentID < cp.SegmentID {
+		if segmentID < cp.SegmentEnd {
 			// segment is fully flushed, skip
 			continue
 		}
 
 		var records []*data.Record
-		if segmentID == cp.SegmentID {
+		if segmentID == cp.SegmentEnd {
 			// segment is partially flushed
-			records, err = w.ReadSegmentFromFile(segmentPath, int64(cp.Offset), true, rev)
+			records, err = w.ReadSegmentFromFile(segmentPath, int64(cp.OffsetEnd), true, rev)
 		} else {
 			// read the whole segment
 			records, err = w.ReadSegmentFromFile(segmentPath, 0 , false, rev)
