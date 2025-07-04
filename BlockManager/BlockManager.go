@@ -98,20 +98,25 @@ func (bm *BlockManager) ReadIndicatorByte(filePath string) (byte, error) {
 	return buffer[0], nil
 }
 
-func (blockManager *BlockManager) ReadWalBlock(filePath string, numberOfBlock uint64, indicatorSize int64) ([]byte, error) {
-	buffer := make([]byte, blockManager.BlockSize)
-	offset := int64(numberOfBlock)*int64(blockManager.BlockSize) + indicatorSize
-	file, err := os.OpenFile(filePath, os.O_RDONLY, 0666)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-	bytesRead, err := file.ReadAt(buffer, offset)
-	if err != nil && err != io.EOF {
-		return nil, fmt.Errorf("failed to read block: %w", err)
-	}
-	if bytesRead == 0 {
-		return nil, io.EOF
-	}
-	return buffer[:bytesRead], nil
+func (blockManager *BlockManager) ReadWalBlock(filePath string, blockNumber uint64, metaSummary int64) ([]byte, error) {
+    file, err := os.Open(filePath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
+    }
+    defer file.Close()
+
+    offset := int64(blockNumber)*int64(blockManager.BlockSize) + metaSummary
+
+    _, err = file.Seek(offset, io.SeekStart)
+    if err != nil {
+        return nil, fmt.Errorf("failed to seek to block %d in file %s: %w", blockNumber, filePath, err)
+    }
+
+    buffer := make([]byte, blockManager.BlockSize)
+    n, err := file.Read(buffer)
+    if err != nil && err != io.EOF {
+        return nil, fmt.Errorf("failed to read block %d in file %s: %w", blockNumber, filePath, err)
+    }
+
+    return buffer[:n], nil
 }

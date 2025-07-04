@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -233,86 +232,83 @@ func ConvertWalBlockToDataBlock(wb *Block) (*data.Block, error) {
 	return &data.Block{Records: allBytes}, nil
 }
 
-// a function that reads the segment record by record
 func (w *Wal) ReadSegmentFromFile(filePath string, offset int64, useCheckpoint bool, revoked bool) ([]*data.Record, error) {
-	if !useCheckpoint {
-		offset = 1
-	}
+    if !useCheckpoint {
+        offset = 1
+    }
 
-	segmentID := ExtractSegmentNumber(filepath.Base(filePath))
+    segmentID := ExtractSegmentNumber(filepath.Base(filePath))
+    var records []*data.Record
+    var data1 []byte
+    currentOffset := int(offset)
 
-	var records []*data.Record
-	var data1 []byte
-	currentOffset := int(offset)
+    blockNumber := uint64(offset) / w.blockSize
+	innerOffset := offset % int64(w.blockSize)
+    for {
+        buffer, err := w.blockManager.ReadWalBlock(filePath, blockNumber, innerOffset)
+        if err != nil {
+            return nil, err
+        }
+        if len(buffer) == 0 {
+            break
+        }
 
-	indicatorSize := int64(1)
-	startBlock := offset / int64(w.blockSize)
+        data1 = append(data1, buffer...)
 
-	for blockNum := startBlock; ; blockNum++ {
-		buffer, err := w.blockManager.ReadWalBlock(filePath, uint64(blockNum), indicatorSize)
-		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("failed to read file: %w", err)
-		}
+        i := 0
+        for i < len(data1) {
+            for i < len(data1) && data1[i] == 0 {
+                i++
+            }
+            minHeaderSize := data.KEY_START
+            if len(data1[i:]) < minHeaderSize {
+                break
+            }
 
-		n:=len(buffer)
-		if n == 0 {
-			break
-		}
-		// handles leftovers
-		data1 = append(data1, buffer[:n]...)
+            keySize := binary.LittleEndian.Uint64(data1[i+data.KEY_SIZE_START:])
+            valueSize := binary.LittleEndian.Uint64(data1[i+data.VALUE_SIZE_START:])
+            totalSize := data.KEY_START + int(keySize) + int(valueSize)
 
-		i:=0
-		for i<len(data1){
-			for i < len(data1) && data1[i] == 0 {
-				i++
-			}
-			minHeaderSize := data.KEY_START
-			if len(data1[i:]) < minHeaderSize {
-				break
-			}
+            j := i
+            for j+totalSize < len(data1) && data1[j+totalSize] == 0 {
+                j++
+                currentOffset++
+            }
 
-			keySize := binary.LittleEndian.Uint64(data1[i+data.KEY_SIZE_START:])
-			valueSize := binary.LittleEndian.Uint64(data1[i+data.VALUE_SIZE_START:])
-			totalSize := data.KEY_START + int(keySize) + int(valueSize)
-			
-			j := i
-			for j+totalSize < len(data1) && data1[j+totalSize] == 0 {
-				j++
-				currentOffset++
-			}
+            if len(data1[i:]) < totalSize {
+                break
+            }
 
-			if len(data1[i:]) < totalSize {
-				break
-			}
+            record, err := data.FromBytes(data1[i:])
+            if err != nil {
+                return nil, fmt.Errorf("failed to parse record at position %d: %w", i, err)
+            }
+            records = append(records, record)
 
-			record, err := data.FromBytes(data1[i:])
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse record at position %d: %w",i, err)
-			}
-			records = append(records, record)
+            recordBytes, err := record.ToBytes()
+            if err != nil {
+                return nil, fmt.Errorf("failed to serialize record to bytes: %w", err)
+            }
+            if revoked {
+                key := FragmentKey{
+                    Key:       record.Key,
+                    Timestamp: record.Timestamp,
+                }
+                pos := Position{
+                    SegmentID: segmentID,
+                    Offset:    currentOffset,
+                    Size:      len(recordBytes),
+                }
+                w.recordPositions[key] = append(w.recordPositions[key], pos)
+            }
+            currentOffset += len(recordBytes)
+            i += len(recordBytes)
+        }
 
-			recordBytes, err := record.ToBytes()
-			if err != nil {
-				return nil, fmt.Errorf("failed to serialize record to bytes: %w", err)
-			}
-			if revoked {
-				key := FragmentKey{
-					Key:       record.Key,
-					Timestamp: record.Timestamp,
-				}
-				pos := Position{
-					SegmentID: segmentID,
-					Offset:    currentOffset,
-					Size:      len(recordBytes),
-				}
-				w.recordPositions[key] = append(w.recordPositions[key], pos)
-			}
-			currentOffset += len(recordBytes)
-			i += len(recordBytes)
-		}
-		data1 = data1[i:]
-	}
-	return records, nil
+        data1 = data1[i:]
+        blockNumber++
+    }
+    return records, nil
 }
 
 func (w *Wal) ReadFirstByte(segmentPath string) (byte, error) {
