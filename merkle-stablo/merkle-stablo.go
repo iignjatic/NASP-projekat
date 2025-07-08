@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
-	"log"
 	"os"
 )
 
@@ -52,6 +50,11 @@ func CreateLeafNodes(blocks []*data.Block) []*MerkleNode {
 // kombinuju se hesevi djece kako bi se kreirali roditelji
 
 func BuildMerkleTreeBottomUp(nodes []*MerkleNode) *MerkleNode {
+
+	if len(nodes) == 0 {
+		return nil
+	}
+
 	if len(nodes) == 1 {
 		return nodes[0]
 	}
@@ -282,54 +285,54 @@ func SerializeMerkleTree(root *MerkleNode, file *os.File) error {
 	return writeNode(root)
 }
 
-func main() {
-	// 1. Kreiramo testne blokove
-	blocks := []*data.Block{
-		{Records: []byte("Zapis 1")},
-		{Records: []byte("Zapis 2")},
-		{Records: []byte("Zapis 3")},
-		{Records: []byte("Zapis 4")},
-	}
+// func main() {
+// 	// 1. Kreiramo testne blokove
+// 	blocks := []*data.Block{
+// 		{Records: []byte("Zapis 1")},
+// 		{Records: []byte("Zapis 2")},
+// 		{Records: []byte("Zapis 3")},
+// 		{Records: []byte("Zapis 4")},
+// 	}
 
-	// 2. Kreiramo listove i izgradimo Merkle stablo
-	leafNodes := CreateLeafNodes(blocks)
-	root := BuildMerkleTreeBottomUp(leafNodes)
+// 	// 2. Kreiramo listove i izgradimo Merkle stablo
+// 	leafNodes := CreateLeafNodes(blocks)
+// 	root := BuildMerkleTreeBottomUp(leafNodes)
 
-	// 3. Otvaramo fajl za serijalizaciju
-	fileName := "merkle_tree_test.dat"
-	file, err := os.Create(fileName)
-	if err != nil {
-		log.Fatalf("Greska pri kreiranju fajla: %v", err)
-	}
-	defer file.Close()
+// 	// 3. Otvaramo fajl za serijalizaciju
+// 	fileName := "merkle_tree_test.dat"
+// 	file, err := os.Create(fileName)
+// 	if err != nil {
+// 		log.Fatalf("Greska pri kreiranju fajla: %v", err)
+// 	}
+// 	defer file.Close()
 
-	// 4. Serijalizujemo stablo
-	err = SerializeMerkleTree(root, file)
-	if err != nil {
-		log.Fatalf("Greska pri serijalizaciji: %v", err)
-	}
-	fmt.Println("Merkle stablo je uspjesno serijalizovano.")
+// 	// 4. Serijalizujemo stablo
+// 	err = SerializeMerkleTree(root, file)
+// 	if err != nil {
+// 		log.Fatalf("Greska pri serijalizaciji: %v", err)
+// 	}
+// 	fmt.Println("Merkle stablo je uspjesno serijalizovano.")
 
-	// 5. Ponovo otvaramo fajl za čitanje
-	fileForRead, err := os.Open(fileName)
-	if err != nil {
-		log.Fatalf("Greska pri otvaranju fajla za čitanje: %v", err)
-	}
-	defer fileForRead.Close()
+// 	// 5. Ponovo otvaramo fajl za čitanje
+// 	fileForRead, err := os.Open(fileName)
+// 	if err != nil {
+// 		log.Fatalf("Greska pri otvaranju fajla za čitanje: %v", err)
+// 	}
+// 	defer fileForRead.Close()
 
-	// 6. Deserijalizujemo stablo
-	deserializedRoot, err := DeserializeMerkleTree(fileForRead)
-	if err != nil {
-		log.Fatalf("Greška pri deserijalizaciji: %v", err)
-	}
-	fmt.Println("Merkle stablo je uspjesno deserijalizovano.")
+// 	// 6. Deserijalizujemo stablo
+// 	deserializedRoot, err := DeserializeMerkleTree(fileForRead)
+// 	if err != nil {
+// 		log.Fatalf("Greška pri deserijalizaciji: %v", err)
+// 	}
+// 	fmt.Println("Merkle stablo je uspjesno deserijalizovano.")
 
-	// 7. Poređenje originalnog i deserijalizovanog stabla
-	fmt.Println("Poređenje originalnog i deserijalizovanog stabla:")
-	diffIndex := CompareTrees(root, deserializedRoot)
-	if diffIndex == -1 {
-		fmt.Println("Stabla su identicna.")
-	} else {
-		fmt.Printf("Stabla se razlikuju na listu sa indeksom: %d\n", diffIndex)
-	}
-}
+// 	// 7. Poređenje originalnog i deserijalizovanog stabla
+// 	fmt.Println("Poređenje originalnog i deserijalizovanog stabla:")
+// 	diffIndex := CompareTrees(root, deserializedRoot)
+// 	if diffIndex == -1 {
+// 		fmt.Println("Stabla su identicna.")
+// 	} else {
+// 		fmt.Printf("Stabla se razlikuju na listu sa indeksom: %d\n", diffIndex)
+// 	}
+// }

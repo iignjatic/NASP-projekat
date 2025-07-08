@@ -60,6 +60,7 @@ func (tokenB *TokenBucket) GetTokens() error {
 
 	// Ako je broj tokena 0, vraca se greska
 	if tokenB.currentNumberOfTokens <= 0 {
+		fmt.Println("ISTEKLO")
 		return errors.New("nema dovoljno tokena")
 	}
 
@@ -90,12 +91,19 @@ func (t *TokenBucket) SerializeState() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("greska prilikom serijalizacije lastResetTime promjenljive: %v", err)
 	}
-
+	fmt.Println("OVO JE TOKENBUCKET STATE KOJI JE SERIJALIZOVAN ", buf.Bytes())
 	return buf.Bytes(), nil
 }
 
-// DeserializeState deserijalizuje binarni format u stanje TokenBucketa
 func (t *TokenBucket) DeserializeState(data []byte) error {
+	// Ako želiš da ignorišeš poslednji bajt:
+	if len(data) < 1 {
+		return fmt.Errorf("prazan ulazni niz")
+	}
+	data = data[:len(data)-1] // uklanja zadnji bajt
+
+	fmt.Println("OVO JE TOKENBUCKET STATE KOJI TREBA DA SE DESERIJALIZUJE ", data)
+
 	buf := bytes.NewReader(data)
 
 	err := binary.Read(buf, binary.LittleEndian, &t.maximumTokens)
@@ -112,7 +120,7 @@ func (t *TokenBucket) DeserializeState(data []byte) error {
 	}
 	err = binary.Read(buf, binary.LittleEndian, &t.lastTimeReset)
 	if err != nil {
-		return fmt.Errorf("greska prilikom deserijalizacije lastResetTime pormjenljive: %v", err)
+		return fmt.Errorf("greska prilikom deserijalizacije lastResetTime promjenljive: %v", err)
 	}
 
 	return nil
