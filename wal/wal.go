@@ -27,26 +27,26 @@ type Position struct {
 }
 
 type Wal struct {
-	DirectoryPath  string
-	Segments       []*Segment 
-	CurrentSegment *Segment
-	SegmentPaths   []string
-	recordPositions map[FragmentKey][]Position
-	blockSize         uint64
-	blocksPerSegment  uint64
-	blockManager *BlockManager.BlockManager
+	DirectoryPath    string
+	Segments         []*Segment
+	CurrentSegment   *Segment
+	SegmentPaths     []string
+	recordPositions  map[FragmentKey][]Position
+	blockSize        uint64
+	blocksPerSegment uint64
+	blockManager     *BlockManager.BlockManager
 }
 
 func NewWal(bm *BlockManager.BlockManager, blockSize, blocksPerSegment uint64) *Wal {
 	w := &Wal{
-		DirectoryPath:  DIRECTORY_PATH,
-		Segments:       []*Segment{},
-		CurrentSegment: nil,
-		SegmentPaths:   []string{},
-		recordPositions: make(map[FragmentKey][]Position),
-		blockSize: blockSize,
+		DirectoryPath:    DIRECTORY_PATH,
+		Segments:         []*Segment{},
+		CurrentSegment:   nil,
+		SegmentPaths:     []string{},
+		recordPositions:  make(map[FragmentKey][]Position),
+		blockSize:        blockSize,
 		blocksPerSegment: blocksPerSegment,
-		blockManager: bm,
+		blockManager:     bm,
 	}
 
 	w.AddNewSegment()
@@ -80,7 +80,7 @@ func (w *Wal) AddNewSegment() {
 	ifFull, err := w.ReadFirstByte(lastSegment)
 	if err != nil && ifFull != 0 && ifFull != 1 {
 		err := errors.New("cannot read the first byte")
-		fmt.Println("Error: ", err) 
+		fmt.Println("Error: ", err)
 		return
 	}
 
@@ -135,7 +135,7 @@ func (w *Wal) AddNewSegment() {
 func (w *Wal) ReadSegmentNames() ([]string, error) {
 	files, err := os.ReadDir(w.DirectoryPath)
 	if err != nil {
-		return nil, fmt.Errorf("error reading directory: %v", err)  
+		return nil, fmt.Errorf("error reading directory: %v", err)
 	}
 	var segmentNames []string
 	for _, file := range files {
@@ -158,8 +158,8 @@ func (w *Wal) ReadSegmentNames() ([]string, error) {
 
 // return number from segment name
 func ExtractSegmentNumber(name string) int {
-	parts := strings.TrimPrefix(name, "wal_")	// starts with wal_
-	parts = strings.TrimSuffix(parts, ".bin") 	// ends with .bin
+	parts := strings.TrimPrefix(name, "wal_") // starts with wal_
+	parts = strings.TrimSuffix(parts, ".bin") // ends with .bin
 	num, err := strconv.Atoi(parts)
 	if err != nil {
 		return -1
@@ -233,82 +233,82 @@ func ConvertWalBlockToDataBlock(wb *Block) (*data.Block, error) {
 }
 
 func (w *Wal) ReadSegmentFromFile(filePath string, offset int64, useCheckpoint bool, revoked bool) ([]*data.Record, error) {
-    if !useCheckpoint {
-        offset = 1
-    }
+	if !useCheckpoint {
+		offset = 1
+	}
 
-    segmentID := ExtractSegmentNumber(filepath.Base(filePath))
-    var records []*data.Record
-    var data1 []byte
-    currentOffset := int(offset)
+	segmentID := ExtractSegmentNumber(filepath.Base(filePath))
+	var records []*data.Record
+	var data1 []byte
+	currentOffset := int(offset)
 
-    blockNumber := uint64(offset) / w.blockSize
+	blockNumber := uint64(offset) / w.blockSize
 	innerOffset := offset % int64(w.blockSize)
-    for {
-        buffer, err := w.blockManager.ReadWalBlock(filePath, blockNumber, innerOffset)
-        if err != nil {
-            return nil, err
-        }
-        if len(buffer) == 0 {
-            break
-        }
+	for {
+		buffer, err := w.blockManager.ReadWalBlock(filePath, blockNumber, innerOffset)
+		if err != nil {
+			return nil, err
+		}
+		if len(buffer) == 0 {
+			break
+		}
 
-        data1 = append(data1, buffer...)
+		data1 = append(data1, buffer...)
 
-        i := 0
-        for i < len(data1) {
-            for i < len(data1) && data1[i] == 0 {
-                i++
-            }
-            minHeaderSize := data.KEY_START
-            if len(data1[i:]) < minHeaderSize {
-                break
-            }
+		i := 0
+		for i < len(data1) {
+			for i < len(data1) && data1[i] == 0 {
+				i++
+			}
+			minHeaderSize := data.KEY_START
+			if len(data1[i:]) < minHeaderSize {
+				break
+			}
 
-            keySize := binary.LittleEndian.Uint64(data1[i+data.KEY_SIZE_START:])
-            valueSize := binary.LittleEndian.Uint64(data1[i+data.VALUE_SIZE_START:])
-            totalSize := data.KEY_START + int(keySize) + int(valueSize)
+			keySize := binary.LittleEndian.Uint64(data1[i+data.KEY_SIZE_START:])
+			valueSize := binary.LittleEndian.Uint64(data1[i+data.VALUE_SIZE_START:])
+			totalSize := data.KEY_START + int(keySize) + int(valueSize)
 
-            j := i
-            for j+totalSize < len(data1) && data1[j+totalSize] == 0 {
-                j++
-                currentOffset++
-            }
+			j := i
+			for j+totalSize < len(data1) && data1[j+totalSize] == 0 {
+				j++
+				currentOffset++
+			}
 
-            if len(data1[i:]) < totalSize {
-                break
-            }
+			if len(data1[i:]) < totalSize {
+				break
+			}
 
-            record, err := data.FromBytes(data1[i:])
-            if err != nil {
-                return nil, fmt.Errorf("failed to parse record at position %d: %w", i, err)
-            }
-            records = append(records, record)
+			record, err := data.FromBytes(data1[i:])
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse record at position %d: %w", i, err)
+			}
+			records = append(records, record)
 
-            recordBytes, err := record.ToBytes()
-            if err != nil {
-                return nil, fmt.Errorf("failed to serialize record to bytes: %w", err)
-            }
-            if revoked {
-                key := FragmentKey{
-                    Key:       record.Key,
-                    Timestamp: record.Timestamp,
-                }
-                pos := Position{
-                    SegmentID: segmentID,
-                    Offset:    currentOffset,
-                    Size:      len(recordBytes),
-                }
-                w.recordPositions[key] = append(w.recordPositions[key], pos)
-            }
-            currentOffset += len(recordBytes)
-            i += len(recordBytes)
-        }
+			recordBytes, err := record.ToBytes()
+			if err != nil {
+				return nil, fmt.Errorf("failed to serialize record to bytes: %w", err)
+			}
+			if revoked {
+				key := FragmentKey{
+					Key:       record.Key,
+					Timestamp: record.Timestamp,
+				}
+				pos := Position{
+					SegmentID: segmentID,
+					Offset:    currentOffset,
+					Size:      len(recordBytes),
+				}
+				w.recordPositions[key] = append(w.recordPositions[key], pos)
+			}
+			currentOffset += len(recordBytes)
+			i += len(recordBytes)
+		}
 
-        data1 = data1[i:]
-        blockNumber++
-    }
-    return records, nil
+		data1 = data1[i:]
+		blockNumber++
+	}
+	return records, nil
 }
 
 func (w *Wal) ReadFirstByte(segmentPath string) (byte, error) {
@@ -347,7 +347,7 @@ func (w *Wal) ReadAllSegmentsCP(rev bool) ([]*data.Record, error) {
 			records, err = w.ReadSegmentFromFile(segmentPath, int64(cp.OffsetEnd), true, rev)
 		} else {
 			// read the whole segment
-			records, err = w.ReadSegmentFromFile(segmentPath, 0 , false, rev)
+			records, err = w.ReadSegmentFromFile(segmentPath, 0, false, rev)
 		}
 
 		if err != nil {
@@ -365,7 +365,7 @@ func (w *Wal) ReadAllSegmentsCP(rev bool) ([]*data.Record, error) {
 }
 
 func NoZerosRecords(r []*data.Record) []*data.Record {
-	for i:=0; i<len(r); i++ {
+	for i := 0; i < len(r); i++ {
 		r[i].Value = TrimZeros(r[i].Value)
 		r[i].ValueSize = uint64(len(r[i].Value))
 	}
@@ -379,9 +379,9 @@ func NoZerosRecord(r *data.Record) *data.Record {
 }
 
 func DefragmentRecords(r []*data.Record) []*data.Record {
-	var temp []*data.Record 
+	var temp []*data.Record
 	record := data.NewRecord("", []byte(""))
-	for i:=0; i< len(r); i++ {
+	for i := 0; i < len(r); i++ {
 		if r[i].Type == 'a' {
 			temp = append(temp, r[i])
 		} else if r[i].Type == 'f' {
@@ -395,7 +395,7 @@ func DefragmentRecords(r []*data.Record) []*data.Record {
 			record.Value = append(record.Value, r[i].Value...)
 		}
 		if r[i].Type == 'm' {
-			record.Value = append(record.Value, r[i].Value...  )
+			record.Value = append(record.Value, r[i].Value...)
 			record.ValueSize += r[i].ValueSize
 		} else if r[i].Type == 'l' {
 			record.Value = append(record.Value, r[i].Value...)

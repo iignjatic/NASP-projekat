@@ -51,7 +51,7 @@ type Record struct {
 }
 
 func NewRecord(key string, value []byte) *Record {
-	timestamp := fmt.Sprintf("%d", time.Now().UTC().Unix())
+	timestamp := fmt.Sprintf("%d", time.Now().UTC().UnixNano())
 	rec := &Record{
 		Crc:       0, // computed during serialization
 		Timestamp: timestamp,
@@ -107,7 +107,7 @@ func (r *Record) ToBytes() ([]byte, error) {
 	// Serialize KeySize and ValueSize
 	binary.LittleEndian.PutUint64(bytesArray[KEY_SIZE_START:], uint64(keySize))
 	binary.LittleEndian.PutUint64(bytesArray[VALUE_SIZE_START:], uint64(realValueSize))
-	
+
 	// Serialize Key and Value
 	copy(bytesArray[KEY_START:], r.Key)
 	copy(bytesArray[KEY_START+keySize:], r.Value)
@@ -209,7 +209,7 @@ func CalculateRecordSize(record *Record) int {
 	return KEY_START + len(record.Key) + len(record.Value)
 }
 
-func TrimZeros(data []byte) ([]byte) {
+func TrimZeros(data []byte) []byte {
 	for len(data) > 0 && data[len(data)-1] == 0 {
 		data = data[:len(data)-1]
 	}

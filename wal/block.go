@@ -76,7 +76,11 @@ func (w *Wal) writePadding(block *Block, record *data.Record) {
 
 func (w *Wal) newBlockThenPadding(record *data.Record) {
 	block := w.createNextBlock()
-	w.HandleZeros(block, record)
+	if uint64(data.CalculateRecordSize(record)) == block.FullCapacity {
+		w.SaveRecordToBlock(block, record, false)
+	} else {
+		w.HandleZeros(block, record)
+	}
 }
 
 func (w *Wal) fragmentInSameBlock(block *Block, record *data.Record) {
@@ -97,7 +101,7 @@ func (w *Wal) createNextBlock() *Block {
 	}
 
 	lastBlock := w.getCurrentBlock()
-	newBlock := NewBlock(lastBlock.ID + 1, w.blockSize)
+	newBlock := NewBlock(lastBlock.ID+1, w.blockSize)
 	w.CurrentSegment.Blocks = append(w.CurrentSegment.Blocks, newBlock)
 	return newBlock
 }

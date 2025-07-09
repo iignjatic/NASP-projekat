@@ -42,6 +42,7 @@ func CreateLeafNodes(blocks []*data.Block) []*MerkleNode {
 			Data:      block.Records,
 			NumLeaves: 1,
 		})
+
 	}
 	return leafNodes
 }
@@ -195,7 +196,7 @@ func CompareTrees(root1, root2 *MerkleNode) int32 {
 				currentLeafIndex = idx
 			}
 
-			// provjeraa se desno podstablo
+			// provjerava se desno podstablo
 			if idx, found := compare(node1.RightChild, node2.RightChild, currentLeafIndex); found {
 				return idx, true // razlika je pronadjena u desnom podstablu, odmah se vraca index i true
 			} else if idx != -1 { // Ako desna grana nije imala razliku, ali je vratila novi indeks (doslo je do preskakanja), azurira se currentLeafIndex

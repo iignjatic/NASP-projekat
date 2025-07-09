@@ -120,6 +120,7 @@ func main() {
 
 	var sstableName string
 	const tokenBucketKey = "token_bucket"
+	tb := &tokenBucket.TokenBucket{}
 
 	w := wal.NewWal(blockManager, BLOCK_SIZE, BLOCKS_PER_SEGMENT)
 
@@ -226,11 +227,8 @@ func main() {
 
 	// AKO TOKENBUCKET NIJE PRONADJEN U SISTEMU, ONDA GA TREBA NAPRAVITI
 
-	var tb *tokenBucket.TokenBucket
-
-	fmt.Println("TOKENBUCKET NIJE PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA ZNACI NIGDJE PRILLIKOM POKRETANJA SISTEMA NIJE PRONADJEN")
-
 	if !found {
+		fmt.Println("TOKENBUCKET NIJE PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA ZNACI NIGDJE PRILLIKOM POKRETANJA SISTEMA NIJE PRONADJEN")
 		tb = tokenBucket.NewTokenBucket(MAX_TOKENS, RESET_INTERVAL)
 		tokenBucketState, err := tb.SerializeState()
 		if err != nil {
@@ -356,13 +354,13 @@ func main() {
 	}
 
 	for {
+
 		fmt.Println(" * KEY - VALUE ENGINE * ")
 		fmt.Println("Izaberite opciju: ")
 		fmt.Println("1. GET [ key ] ")
 		fmt.Println("2. PUT [ key, value] ")
 		fmt.Println("3. DELETE [ key ]")
 		fmt.Println("4. PROVJERA INTEGRITETA PODATAKA [ naziv  SSTable-a npr. sstable_1]")
-		fmt.Println("5. IZLAZ")
 
 		fmt.Scan(&input)
 		//input = 1
@@ -454,7 +452,7 @@ func main() {
 				fmt.Println("Greška pri deserijalizaciji TokenBucket-a")
 				continue
 			}
-			tb.GetTokens()
+			tb.DecreaseResetTokens()
 			updatedTokenBucketState, err := tb.SerializeState()
 			if err != nil {
 				fmt.Println("Greška pri serijalizaciji azuriranog TokenBucket-a:", err)
@@ -592,8 +590,15 @@ func main() {
 
 			fmt.Println("TOKENBUCKET JE AZURIRAN U SISTEMU POSLE GET OPERACIJE")
 
+			if tb.GetCurrentNumberOfTokens() < 0 {
+				fmt.Println("POTROSILI STE SVE TOKENE, OPERACIJA KOJU STE POSLJEDNJE UNIJELI NIJE IZVRSENA, PROBAJTE PONOVO KASNIJE")
+
+				continue
+			}
+
 		} else {
-			fmt.Println("Token bucket nije pronadjen A TREBAO BI DA BUDE PRONADJEN OVO JE")
+			panic("Token bucket nije pronadjen A TREBAO BI DA BUDE PRONADJEN OVO JE BIO POKUSAJ PUT AZURIRANONG TB")
+
 		}
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -886,6 +891,8 @@ func main() {
 			}
 			defer dataFile.Close()
 
+			fmt.Println("ODAVDE PRAVIM ", filePath)
+
 			// 1. Ucitavanje blokova iz fajla
 			dataBlocks := dataSeg.BlocksToMerkle(filePath)
 
@@ -900,6 +907,7 @@ func main() {
 			fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
 
 			dataSerializeFileName := "../SSTable/files/sstable_" + number + "/metadata" + number + "/merkle_tree" + number + ".bin"
+			fmt.Println("ODAVDE CITAM OD RANIJE ", dataSerializeFileName)
 			// 1. Otvaranje fajla za citanje
 			metaDatafile, err := os.Open(dataSerializeFileName)
 			if err != nil {
@@ -929,11 +937,7 @@ func main() {
 
 			}
 
-		} else if input == 5 {
-			break
-		} else {
-			fmt.Println("Nepoznata opcija, molimo unesite ponovo.")
-			continue
 		}
+
 	}
 }

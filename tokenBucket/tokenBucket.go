@@ -3,7 +3,6 @@ package tokenBucket
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -49,25 +48,23 @@ func (tokenB *TokenBucket) ResetTokens() {
 
 // getTokens uzima tokene iz TokenBucketa
 // kao argumente prima TokenBucket
-func (tokenB *TokenBucket) GetTokens() error {
+func (tokenB *TokenBucket) DecreaseResetTokens() bool {
 	tokenB.mu.Lock()
 	defer tokenB.mu.Unlock()
+
+	fmt.Println("TRENUTNI BROJ TOKENA PRIJE SMANJENJA U FUNKCIJI I BILO KAKVOG RESETOVANJA, OVO PRIMA FUNCKIJA ZA SMANJIVANJE : ", tokenB.currentNumberOfTokens)
 
 	// Provjerava se da li je proslo dovoljno vremena kako bi se tokeni resetovali
 	if IsPast(tokenB.lastTimeReset + tokenB.resetInterval) {
 		tokenB.ResetTokens()
 	}
 
-	// Ako je broj tokena 0, vraca se greska
-	if tokenB.currentNumberOfTokens <= 0 {
-		fmt.Println("ISTEKLO")
-		return errors.New("nema dovoljno tokena")
-	}
-
 	// Smajuje se broj tokena
 	tokenB.currentNumberOfTokens--
 
-	return nil
+	fmt.Println("TRENUTNI BROJ TOKENA NAKON SMANJENJA U FUNKCIJI : ", tokenB.currentNumberOfTokens)
+
+	return true
 }
 
 // SerializeState serijalizuje stanje TokenBucketa u binarni format
@@ -95,6 +92,7 @@ func (t *TokenBucket) SerializeState() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// DeserializeState deserijalizuje stanje TokenBucketa
 func (t *TokenBucket) DeserializeState(data []byte) error {
 	// Ako želiš da ignorišeš poslednji bajt:
 	if len(data) < 1 {
@@ -105,6 +103,8 @@ func (t *TokenBucket) DeserializeState(data []byte) error {
 	fmt.Println("OVO JE TOKENBUCKET STATE KOJI TREBA DA SE DESERIJALIZUJE ", data)
 
 	buf := bytes.NewReader(data)
+
+	fmt.Println("OVO JE TOKENBUCKET STATE BUFFER ", buf)
 
 	err := binary.Read(buf, binary.LittleEndian, &t.maximumTokens)
 	if err != nil {
@@ -124,6 +124,13 @@ func (t *TokenBucket) DeserializeState(data []byte) error {
 	}
 
 	return nil
+}
+
+// GetCurrentNumberOfTokens vraća trenutni broj tokena u TokenBucketu
+func (t *TokenBucket) GetCurrentNumberOfTokens() int64 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.currentNumberOfTokens
 }
 
 // // SaveState cuva stanje TokenBucketa u binarni fajl
