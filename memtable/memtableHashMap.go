@@ -205,7 +205,7 @@ func (mm *MemtableManagerHM) Get(key string) (*data.Record, error) {
 func (mm *MemtableManagerHM) Delete(record *data.Record) ([]*data.Record, bool, error) {
 	acitveTable := mm.tables[mm.acitveIndex]
 
-	record, exist := acitveTable.data[record.Key]
+	existingRecord, exist := acitveTable.data[record.Key]
 	if !exist {
 		flushedRecords, flush, err := mm.Put(record)
 		if err != nil {
@@ -213,8 +213,8 @@ func (mm *MemtableManagerHM) Delete(record *data.Record) ([]*data.Record, bool, 
 		}
 		return flushedRecords, flush, nil
 	}
-	record.Tombstone = true
-	acitveTable.data[record.Key] = record
+	existingRecord.Tombstone = true
+	acitveTable.data[record.Key] = existingRecord
 	return nil, false, nil
 }
 
