@@ -1,7 +1,5 @@
 package main
 
-// NAPRAVI DA PRVO PROVJERI TOKENBUCKET PA TEK ONDA
-
 import (
 	"NASP-PROJEKAT/BlockCache"
 	"NASP-PROJEKAT/BlockManager"
@@ -159,7 +157,7 @@ func main() {
 	if record, _ := memtable.Get(tokenBucketKey); record != nil {
 		fmt.Println("Zapis je pronadjen : ", string(value))
 		found = true
-		fmt.Println("TOKENBUCKET JE PRONADJEN U SISTEMU PRILIKOM POKRETANJA PROGRAMA U MEMTABELI")
+		//fmt.Println("TOKENBUCKET JE PRONADJEN U SISTEMU PRILIKOM POKRETANJA PROGRAMA U MEMTABELI")
 	}
 
 	// else if SEARCHCACHE != nil
@@ -168,7 +166,7 @@ func main() {
 	if !found {
 		if value = recordCache.Get(tokenBucketKey); value != nil {
 			fmt.Println("Zapis je pronadjen : ", value)
-			fmt.Println("TOKENBUCKET JE PRONADJEN U SISTEMU PRILIKOM POKRETANJA PROGRAMA U RECORDCACHE")
+			//fmt.Println("TOKENBUCKET JE PRONADJEN U SISTEMU PRILIKOM POKRETANJA PROGRAMA U RECORDCACHE")
 			found = true
 		}
 	}
@@ -206,36 +204,36 @@ func main() {
 				continue
 			} else if len(value) == 0 {
 				fmt.Println("Zapis je obrisan")
-				fmt.Println("TOKENBUCKET JE OBRISAN IZ SISTEMA VIDJENO PREKO SSTABLE PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA")
+				//	fmt.Println("TOKENBUCKET JE OBRISAN IZ SISTEMA VIDJENO PREKO SSTABLE PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA")
 				break
 			} else {
 				fmt.Println("Zapis je pronadjen : ", string(value))
 				recordCache.Put(tokenBucketKey, value)
-				fmt.Println("STA SAM PISAO U RECORDCACHE KAD SAM GA UPDATOVAO POSLE SSTABLE PRILIKOM GET ZA TOKENBUCKET PRILIKOM POKRETANJA PROGRAMA ", string(value))
+				//fmt.Println("STA SAM PISAO U RECORDCACHE KAD SAM GA UPDATOVAO POSLE SSTABLE PRILIKOM GET ZA TOKENBUCKET PRILIKOM POKRETANJA PROGRAMA ", string(value))
 				//update CACHE!!!!!!!!!!!!!!!!!!
 				found = true
-				fmt.Println("TOKENBUCKET PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA U SSTABLE")
+				//fmt.Println("TOKENBUCKET PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA U SSTABLE")
 				break
 			}
 
 		}
 		if value == nil {
 			fmt.Println("Zapis nije pronadjen")
-			fmt.Println("TOKENBUCKET NIJE PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA U SSTABLE")
+			//fmt.Println("TOKENBUCKET NIJE PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA U SSTABLE")
 		}
 	}
 
 	// AKO TOKENBUCKET NIJE PRONADJEN U SISTEMU, ONDA GA TREBA NAPRAVITI
 
 	if !found {
-		fmt.Println("TOKENBUCKET NIJE PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA ZNACI NIGDJE PRILLIKOM POKRETANJA SISTEMA NIJE PRONADJEN")
+		//fmt.Println("TOKENBUCKET NIJE PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA ZNACI NIGDJE PRILLIKOM POKRETANJA SISTEMA NIJE PRONADJEN")
 		tb = tokenBucket.NewTokenBucket(MAX_TOKENS, RESET_INTERVAL)
 		tokenBucketState, err := tb.SerializeState()
 		if err != nil {
 			log.Fatalf("Greska prilikom serijalizacije tokenBucket-a: %v", err)
 		}
 
-		fmt.Println("OVO JE TOKENBACKETSTATE ", tokenBucketState)
+		//fmt.Println("OVO JE TOKENBACKETSTATE ", tokenBucketState)
 
 		// DODAJEM TOKENBUCKET U SISTEM
 
@@ -259,7 +257,7 @@ func main() {
 		}
 
 		recordCache.Put(tokenBucketKey, tokenBucketState) // ovdje sam dodao upis u recordCache
-		fmt.Println("TOKENBUCKET JE DODAT U SISTEM PRILIKOM POKRETANJA APLIKACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO TOKENBUCKET STATE ", tokenBucketState)
+		//	fmt.Println("TOKENBUCKET JE DODAT U SISTEM PRILIKOM POKRETANJA APLIKACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO TOKENBUCKET STATE ", tokenBucketState)
 
 		if flush {
 			// flushedRecords je niz pokazivaca za sstable
@@ -307,12 +305,10 @@ func main() {
 			dataOriginalRoot := merkleStablo.BuildMerkleTreeBottomUp(dataLeafNodes)
 
 			// // kreiram MerkleTree objekat
-			dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
-			fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
+			//dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
+			//fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
 
 			dataSerializeFileName := metadataPath + "/merkle_tree" + strconv.Itoa(numOfSSTables) + ".bin"
-
-			// // NAPRAVI VALIDACIJU DA IDE PO FOLDERIMA KAKO TREBA DA UZIMA FAJLOVE
 
 			// // otvaranje fajla za pisanje
 			dataFile, err := os.Create(dataSerializeFileName)
@@ -350,7 +346,7 @@ func main() {
 		for i := 0; i < len(defragmentedRecords); i++ {
 			fmt.Println(defragmentedRecords[i])
 		}
-		fmt.Println("TOKENBUCKET JE NAPRAVLJEN I DODAT U SISTEM PRILIKOM POKRETANJA APLIKACIJE")
+		//fmt.Println("TOKENBUCKET JE NAPRAVLJEN I DODAT U SISTEM PRILIKOM POKRETANJA APLIKACIJE")
 	}
 
 	for {
@@ -365,7 +361,6 @@ func main() {
 		//fmt.Scan(&input)
 		input = 3
 
-		// PROBAJ OVJDE DA DODAS KOD DA SMANJI ZA TOKENBUCKET ALI PROVJERI JE LI TI DOBRA LOGIKA
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// RADIM GET ZA TOKENBUCKET
 
@@ -377,7 +372,7 @@ func main() {
 			found = true
 			tmp, _ := memtable.Get(tokenBucketKey)
 			tokenBucketStateValue = tmp.Value
-			fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U MEMTABELI  TRAZIO SAM TOKENBUCKET I NASAO ", tokenBucketStateValue)
+			//fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U MEMTABELI  TRAZIO SAM TOKENBUCKET I NASAO ", tokenBucketStateValue)
 
 		}
 
@@ -389,7 +384,7 @@ func main() {
 				fmt.Println("Zapis je pronadjen : ", string(value))
 				found = true
 				tokenBucketStateValue = value
-				fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U RECORDCACHE  TRAZIO SAM TOKENBUCKET I NASAO ", tokenBucketStateValue)
+				//fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U RECORDCACHE  TRAZIO SAM TOKENBUCKET I NASAO ", tokenBucketStateValue)
 			}
 		}
 
@@ -434,7 +429,7 @@ func main() {
 					//update CACHE!!!!!!!!!!!!!!!!!!
 					found = true
 					tokenBucketStateValue = value
-					fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U RECORDCACHE  TRAZIO SAM TOKENBUCKET I NASAO ", tokenBucketStateValue)
+					//fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U RECORDCACHE  TRAZIO SAM TOKENBUCKET I NASAO ", tokenBucketStateValue)
 					break
 				}
 
@@ -459,7 +454,7 @@ func main() {
 				continue
 			}
 
-			fmt.Println("USPIO SAM DA DESERIJALIZUJEM TOKENBUCKET DA GA PROMJENIM I DESERJALIZUJEM")
+			//fmt.Println("USPIO SAM DA DESERIJALIZUJEM TOKENBUCKET DA GA PROMJENIM I DESERJALIZUJEM")
 
 			// PISEM AZURIRANI TOKENBUCKET U SISTEM
 
@@ -483,7 +478,7 @@ func main() {
 			}
 
 			recordCache.Put(tokenBucketKey, updatedTokenBucketState) // ovdje sam dodao upis u recordCache
-			fmt.Println("TOKENBUCKET JE AZURIRAN U SISTEMU PRILIKOM GET OPERACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO TOKENBUCKET STATE. ZNACI UPISUJE SE AZURIRANI TOKENBUCKET U SISTEM ", updatedTokenBucketState)
+			//fmt.Println("TOKENBUCKET JE AZURIRAN U SISTEMU PRILIKOM GET OPERACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO TOKENBUCKET STATE. ZNACI UPISUJE SE AZURIRANI TOKENBUCKET U SISTEM ", updatedTokenBucketState)
 
 			if flush {
 				// flushedRecords je niz pokazivaca za sstable
@@ -493,8 +488,8 @@ func main() {
 
 				metadataPath := "../SSTable/files/" + newSSTable + "/metadata" + strconv.Itoa(numOfSSTables)
 
-				fmt.Println("OVO JE METADATAPATH")
-				fmt.Println(metadataPath)
+				//fmt.Println("OVO JE METADATAPATH")
+				//fmt.Println(metadataPath)
 
 				err := os.MkdirAll(sstPath, 0755)
 				if err != nil {
@@ -524,28 +519,28 @@ func main() {
 				sst.Summary = summary
 				sst.WriteSSTable()
 
-				fmt.Println("OVO JE PUTANJA")
-				fmt.Println("../SSTable/files/" + newSSTable + "/data" + strconv.Itoa(numOfSSTables) + ".bin")
+				//fmt.Println("OVO JE PUTANJA")
+				//fmt.Println("../SSTable/files/" + newSSTable + "/data" + strconv.Itoa(numOfSSTables) + ".bin")
 				// //  ucitavanje blokova iz fajla
 				dataBlocks := dataSeg.BlocksToMerkle("../SSTable/files/" + newSSTable + "/data" + strconv.Itoa(numOfSSTables) + ".bin")
 
 				// // pravim listove stabla
 				dataLeafNodes := merkleStablo.CreateLeafNodes(dataBlocks)
 
-				fmt.Println("OVO SU DATALEAFNODES")
-				fmt.Println(dataLeafNodes)
+				//fmt.Println("OVO SU DATALEAFNODES")
+				//fmt.Println(dataLeafNodes)
 
-				fmt.Println("JEL OVO OK ZA MERKLE STABLO")
+				//fmt.Println("JEL OVO OK ZA MERKLE STABLO")
 
 				// // 	//  pravim originalno Merkle stablo
 				dataOriginalRoot := merkleStablo.BuildMerkleTreeBottomUp(dataLeafNodes)
 
-				fmt.Println("OVO JE DATAORIGINALROOT")
-				fmt.Println(dataOriginalRoot)
+				//fmt.Println("OVO JE DATAORIGINALROOT")
+				//fmt.Println(dataOriginalRoot)
 
 				// // kreiram MerkleTree objekat
-				dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
-				fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
+				//dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
+				//fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
 
 				dataSerializeFileName := metadataPath + "/merkle_tree" + strconv.Itoa(numOfSSTables) + ".bin"
 
@@ -588,16 +583,16 @@ func main() {
 				fmt.Println(defragmentedRecords[i])
 			}
 
-			fmt.Println("TOKENBUCKET JE AZURIRAN U SISTEMU POSLE GET OPERACIJE")
+			//fmt.Println("TOKENBUCKET JE AZURIRAN U SISTEMU POSLE GET OPERACIJE")
 
 			if tb.GetCurrentNumberOfTokens() < 0 {
-				fmt.Println("POTROSILI STE SVE TOKENE, OPERACIJA KOJU STE POSLJEDNJE UNIJELI NIJE IZVRSENA, PROBAJTE PONOVO KASNIJE")
+				fmt.Println("Potrosili ste sve tokene, operacija koju ste posljednje unijeli nije izvrsena, probajte ponovo kasnije!")
 
 				continue
 			}
 
 		} else {
-			panic("Token bucket nije pronadjen A TREBAO BI DA BUDE PRONADJEN OVO JE BIO POKUSAJ PUT AZURIRANONG TB")
+			panic("TokenBucket bi trebao da bude pronadjen u sistemu ali nije!!!")
 
 		}
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -609,7 +604,7 @@ func main() {
 			//key = "key2"
 
 			if key == tokenBucketKey {
-				fmt.Println("KORISNIKU JE ZABRANJENA BILO KAKVA MANIPULACIJA SA TOKENBUCKETOM")
+				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
 				continue
 			}
 
@@ -623,7 +618,7 @@ func main() {
 
 			if value = recordCache.Get(key); value != nil {
 				fmt.Println("Zapis je pronadjen : ", string(value))
-				fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U RECORDCACHE")
+				//fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U RECORDCACHE")
 
 			}
 
@@ -663,7 +658,7 @@ func main() {
 				} else {
 					fmt.Println("Zapis je pronadjen : ", string(value))
 					recordCache.Put(key, value)
-					fmt.Println("ZAPIS JE DODAT U RECORDCACHE PRILIKOM GET OPERACIJE U SSTABLE")
+					//fmt.Println("ZAPIS JE DODAT U RECORDCACHE PRILIKOM GET OPERACIJE U SSTABLE")
 
 					//update CACHE!!!!!!!!!!!!!!!!!!
 					break
@@ -680,7 +675,7 @@ func main() {
 			fmt.Scan(&key, &value)
 
 			if key == tokenBucketKey {
-				fmt.Println("KORISNIKU JE ZABRANJENA BILO KAKVA MANIPULACIJA SA TOKENBUCKETOM")
+				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
 				continue
 			}
 
@@ -703,7 +698,7 @@ func main() {
 			}
 
 			recordCache.Put(key, []byte(value)) // ovdje sam dodao upis u recordCache
-			fmt.Println("ZAPIS JE DODAT U SISTEM PRILIKOM PUT OPERACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO KEY I VALUE ", key, string(value))
+			//fmt.Println("ZAPIS JE DODAT U SISTEM PRILIKOM PUT OPERACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO KEY I VALUE ", key, string(value))
 
 			if flush {
 				// flushedRecords je niz pokazivaca za sstable
@@ -751,8 +746,8 @@ func main() {
 				dataOriginalRoot := merkleStablo.BuildMerkleTreeBottomUp(dataLeafNodes)
 
 				// // kreiram MerkleTree objekat
-				dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
-				fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
+				//dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
+				//fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
 
 				dataSerializeFileName := metadataPath + "/merkle_tree" + strconv.Itoa(numOfSSTables) + ".bin"
 
@@ -800,15 +795,15 @@ func main() {
 			fmt.Scan(&key)
 
 			if key == tokenBucketKey {
-				fmt.Println("KORISNIKU JE ZABRANJENA BILO KAKVA MANIPULACIJA SA TOKENBUCKETOM")
+				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
 				continue
 			}
 
-			fmt.Println(string(recordCache.Get(key))) // Testiranje da li radi get
+			//fmt.Println(string(recordCache.Get(key))) // Testiranje da li radi get
 
 			recordCache.Delete(key)
 
-			fmt.Println(recordCache.Get(key))
+			//fmt.Println(recordCache.Get(key))
 
 			// write to WAL
 			rec := data.NewRecord(key, []byte{})
@@ -877,7 +872,7 @@ func main() {
 			fmt.Scan(&sstableName)
 
 			if sstableName == tokenBucketKey {
-				fmt.Println("KORISNIKU JE ZABRANJENA BILO KAKVA MANIPULACIJA SA TOKENBUCKETOM")
+				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
 				continue
 			}
 
@@ -891,7 +886,7 @@ func main() {
 			}
 			defer dataFile.Close()
 
-			fmt.Println("ODAVDE PRAVIM ", filePath)
+			//fmt.Println("ODAVDE PRAVIM ", filePath)
 
 			// 1. Ucitavanje blokova iz fajla
 			dataBlocks := dataSeg.BlocksToMerkle(filePath)
@@ -904,10 +899,10 @@ func main() {
 
 			// Kreiranje MerkleTree objekta
 			dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
-			fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
+			//fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
 
 			dataSerializeFileName := "../SSTable/files/sstable_" + number + "/metadata" + number + "/merkle_tree" + number + ".bin"
-			fmt.Println("ODAVDE CITAM OD RANIJE ", dataSerializeFileName)
+			//fmt.Println("ODAVDE CITAM OD RANIJE ", dataSerializeFileName)
 			// 1. Otvaranje fajla za citanje
 			metaDatafile, err := os.Open(dataSerializeFileName)
 			if err != nil {
@@ -922,7 +917,7 @@ func main() {
 				continue
 			}
 
-			fmt.Printf("Korjen ucitanog stabla: %x\n", root.Hash)
+			//fmt.Printf("Korjen ucitanog stabla: %x\n", root.Hash)
 
 			if bytes.Equal(dataOriginalTree.Root.Hash, root.Hash) {
 				fmt.Println("Podaci su ispravni!")
