@@ -10,6 +10,7 @@ import (
 	merkleStablo "NASP-PROJEKAT/merkle-stablo"
 	"NASP-PROJEKAT/tokenBucket"
 	"NASP-PROJEKAT/wal"
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -112,8 +113,8 @@ func main() {
 	files, _ := ioutil.ReadDir("../SSTable/files")
 	numOfSSTables := len(files) / 3
 
-	var input uint32
-	var key string
+	//var input uint32
+	//var key string
 	var value []byte
 
 	var sstableName string
@@ -358,8 +359,17 @@ func main() {
 		fmt.Println("3. DELETE [ key ]")
 		fmt.Println("4. PROVJERA INTEGRITETA PODATAKA [ naziv  SSTable-a npr. sstable_1]")
 
+		reader := bufio.NewReader(os.Stdin)
+		num, _ := reader.ReadString('\n')
+		num = strings.TrimSpace(num)
+
+		input, err := strconv.Atoi(num)
+		if err != nil {
+			fmt.Println("Greška: nije broj.")
+			return
+		}
 		//fmt.Scan(&input)
-		input = 3
+		//input = 3
 
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// RADIM GET ZA TOKENBUCKET
@@ -599,8 +609,11 @@ func main() {
 
 		if input == 1 {
 			//GET operacija
-
-			fmt.Scan(&key)
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print("Unesite ključ: ")
+			key, _ := reader.ReadString('\n')
+			key = strings.TrimSpace(key)
+			//fmt.Scan(&key)
 			//key = "key2"
 
 			if key == tokenBucketKey {
@@ -672,7 +685,14 @@ func main() {
 
 		} else if input == 2 {
 			// put
-			fmt.Scan(&key, &value)
+			fmt.Print("Unesite ključ: ")
+			reader := bufio.NewReader(os.Stdin)
+			key, _ := reader.ReadString('\n')
+			key = strings.TrimSpace(key)
+			fmt.Print("Unesite vrijednost: ")
+			valueStr, _ := reader.ReadString('\n')
+			value = []byte(strings.TrimSpace(valueStr))
+			//fmt.Scan(&key, &value)
 
 			if key == tokenBucketKey {
 				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
@@ -792,7 +812,11 @@ func main() {
 
 		} else if input == 3 {
 			// delete
-			fmt.Scan(&key)
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print("Unesite ključ: ")
+			key, _ := reader.ReadString('\n')
+			key = strings.TrimSpace(key)
+			//fmt.Scan(&key)
 
 			if key == tokenBucketKey {
 				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
