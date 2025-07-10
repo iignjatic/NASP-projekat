@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type SSTable struct {
@@ -118,11 +119,16 @@ func (sstable *SSTable) MakeSSTable(records []*data.Record) {
 	binary.LittleEndian.PutUint64(firstKeySize[0:], records[0].KeySize)
 	lastKey := []byte(records[len(records)-1].Key)
 	binary.LittleEndian.PutUint64(lastKeySize[0:], records[len(records)-1].KeySize)
-	file, err := os.OpenFile(sstable.SummaryFilePath, os.O_CREATE|os.O_WRONLY, 0666)
-
+	err := os.MkdirAll(filepath.Dir(sstable.SummaryFilePath), 0755) //ovdje je bila greska da ne postoji dir
 	if err != nil {
 		panic(err)
 	}
+
+	file, err := os.OpenFile(sstable.SummaryFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		panic(err)
+	}
+
 	var meta []byte
 	meta = append(meta, firstKeySize...)
 	meta = append(meta, firstKey...)

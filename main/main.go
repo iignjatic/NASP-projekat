@@ -362,8 +362,8 @@ func main() {
 		fmt.Println("3. DELETE [ key ]")
 		fmt.Println("4. PROVJERA INTEGRITETA PODATAKA [ naziv  SSTable-a npr. sstable_1]")
 
-		fmt.Scan(&input)
-		//input = 1
+		//fmt.Scan(&input)
+		input = 3
 
 		// PROBAJ OVJDE DA DODAS KOD DA SMANJI ZA TOKENBUCKET ALI PROVJERI JE LI TI DOBRA LOGIKA
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
