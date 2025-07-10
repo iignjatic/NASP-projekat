@@ -52,7 +52,7 @@ func (tokenB *TokenBucket) DecreaseResetTokens() bool {
 	tokenB.mu.Lock()
 	defer tokenB.mu.Unlock()
 
-	fmt.Println("TRENUTNI BROJ TOKENA PRIJE SMANJENJA U FUNKCIJI I BILO KAKVOG RESETOVANJA, OVO PRIMA FUNCKIJA ZA SMANJIVANJE : ", tokenB.currentNumberOfTokens)
+	//fmt.Println("TRENUTNI BROJ TOKENA PRIJE SMANJENJA U FUNKCIJI I BILO KAKVOG RESETOVANJA, OVO PRIMA FUNCKIJA ZA SMANJIVANJE : ", tokenB.currentNumberOfTokens)
 
 	// Provjerava se da li je proslo dovoljno vremena kako bi se tokeni resetovali
 	if IsPast(tokenB.lastTimeReset + tokenB.resetInterval) {
@@ -62,7 +62,7 @@ func (tokenB *TokenBucket) DecreaseResetTokens() bool {
 	// Smajuje se broj tokena
 	tokenB.currentNumberOfTokens--
 
-	fmt.Println("TRENUTNI BROJ TOKENA NAKON SMANJENJA U FUNKCIJI : ", tokenB.currentNumberOfTokens)
+	//fmt.Println("TRENUTNI BROJ TOKENA NAKON SMANJENJA U FUNKCIJI : ", tokenB.currentNumberOfTokens)
 
 	return true
 }
@@ -88,7 +88,7 @@ func (t *TokenBucket) SerializeState() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("greska prilikom serijalizacije lastResetTime promjenljive: %v", err)
 	}
-	fmt.Println("OVO JE TOKENBUCKET STATE KOJI JE SERIJALIZOVAN ", buf.Bytes())
+	//fmt.Println("OVO JE TOKENBUCKET STATE KOJI JE SERIJALIZOVAN ", buf.Bytes())
 	return buf.Bytes(), nil
 }
 
@@ -100,11 +100,11 @@ func (t *TokenBucket) DeserializeState(data []byte) error {
 	}
 	data = data[:len(data)-1] // uklanja zadnji bajt
 
-	fmt.Println("OVO JE TOKENBUCKET STATE KOJI TREBA DA SE DESERIJALIZUJE ", data)
+	//fmt.Println("OVO JE TOKENBUCKET STATE KOJI TREBA DA SE DESERIJALIZUJE ", data)
 
 	buf := bytes.NewReader(data)
 
-	fmt.Println("OVO JE TOKENBUCKET STATE BUFFER ", buf)
+	//fmt.Println("OVO JE TOKENBUCKET STATE BUFFER ", buf)
 
 	err := binary.Read(buf, binary.LittleEndian, &t.maximumTokens)
 	if err != nil {
