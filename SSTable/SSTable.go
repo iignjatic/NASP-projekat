@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type SSTable struct {
@@ -16,6 +17,7 @@ type SSTable struct {
 	DataFilePath    string
 	IndexFilePath   string
 	SummaryFilePath string
+	BlockSize       uint64
 }
 
 func (sst *SSTable) ReadMeta() { //podaci o prvom i poslednjem kljucu
@@ -81,15 +83,15 @@ func (sst *SSTable) getSummarySize(records []*data.Record) uint64 {
 
 func (sstable *SSTable) MakeSSTable(records []*data.Record) {
 	//blokovi za data segment
-	DataSize := sstable.getDataSize(records)                                    //ukupna velicina data dijela
-	sstable.DataSegment.Blocks = make([]*data.Block, DataSize/data.BlockSize+1) //bilo DataSize/BlockSize*2
+	DataSize := sstable.getDataSize(records)                                       //ukupna velicina data dijela
+	sstable.DataSegment.Blocks = make([]*data.Block, DataSize/sstable.BlockSize+1) //bilo DataSize/BlockSize*2
 	for i := range sstable.DataSegment.Blocks {
 		sstable.DataSegment.Blocks[i] = &data.Block{} // Inicijalizacija svakog bloka
 	}
 
 	//blokovi za indeks
-	IndexSize := sstable.getIndexSize(records)                             //ukupna velicina indeksa
-	sstable.Index.Blocks = make([]*data.Block, IndexSize/data.BlockSize+1) //bilo IndexSize/BlockSize*2
+	IndexSize := sstable.getIndexSize(records)                                //ukupna velicina indeksa
+	sstable.Index.Blocks = make([]*data.Block, IndexSize/sstable.BlockSize+1) //bilo IndexSize/BlockSize*2
 	for i := range sstable.Index.Blocks {
 		sstable.Index.Blocks[i] = &data.Block{} // Inicijalizacija svakog bloka
 	}
@@ -97,8 +99,8 @@ func (sstable *SSTable) MakeSSTable(records []*data.Record) {
 	//blokovi za summary
 	//sstable.Summary.Sample = 2 //OVDJE TREBA SAMPLE !!!!!!
 
-	SummarySize := sstable.getSummarySize(records)                             //ukupna velicina samarija
-	sstable.Summary.Blocks = make([]*data.Block, SummarySize/data.BlockSize+1) //bilo SummarySize/BlockSize*2
+	SummarySize := sstable.getSummarySize(records)                                //ukupna velicina samarija
+	sstable.Summary.Blocks = make([]*data.Block, SummarySize/sstable.BlockSize+1) //bilo SummarySize/BlockSize*2
 	for i := range sstable.Summary.Blocks {
 		sstable.Summary.Blocks[i] = &data.Block{} // Inicijalizacija svakog bloka
 	}
@@ -117,11 +119,16 @@ func (sstable *SSTable) MakeSSTable(records []*data.Record) {
 	binary.LittleEndian.PutUint64(firstKeySize[0:], records[0].KeySize)
 	lastKey := []byte(records[len(records)-1].Key)
 	binary.LittleEndian.PutUint64(lastKeySize[0:], records[len(records)-1].KeySize)
-	file, err := os.OpenFile(sstable.SummaryFilePath, os.O_CREATE|os.O_WRONLY, 0666)
-
+	err := os.MkdirAll(filepath.Dir(sstable.SummaryFilePath), 0755) //ovdje je bila greska da ne postoji dir
 	if err != nil {
 		panic(err)
 	}
+
+	file, err := os.OpenFile(sstable.SummaryFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		panic(err)
+	}
+
 	var meta []byte
 	meta = append(meta, firstKeySize...)
 	meta = append(meta, firstKey...)
@@ -141,14 +148,14 @@ func (sst *SSTable) WriteSSTable() {
 	var i uint64 = 0
 
 	for i = 0; i < sst.DataSegment.SegmentSize; i++ {
-		sst.BlockManager.WriteBlock(sst.DataSegment.Blocks[i], sst.DataFilePath, i, data.BlockSize, 0)
+		sst.BlockManager.WriteBlock(sst.DataSegment.Blocks[i], sst.DataFilePath, i, sst.BlockSize, 0)
 	}
 	for i = 0; i < sst.Index.SegmentSize; i++ {
-		sst.BlockManager.WriteBlock(sst.Index.Blocks[i], sst.IndexFilePath, i, data.BlockSize, 0)
+		sst.BlockManager.WriteBlock(sst.Index.Blocks[i], sst.IndexFilePath, i, sst.BlockSize, 0)
 	}
 
 	for i = 0; i < sst.Summary.SegmentSize; i++ {
-		sst.BlockManager.WriteBlock(sst.Summary.Blocks[i], sst.SummaryFilePath, i, data.BlockSize, uint64(sst.Summary.Meta))
+		sst.BlockManager.WriteBlock(sst.Summary.Blocks[i], sst.SummaryFilePath, i, sst.BlockSize, uint64(sst.Summary.Meta))
 	}
 
 }
@@ -161,7 +168,7 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 	var offsetIndex uint64 = 0
 	var offsetSummary uint64 = 0
 	var summaryCount int32 = -1
-	tempBlockSize := data.BlockSize
+	tempBlockSize := sst.BlockSize
 	var recordBytes []byte
 	var blocks []*data.Block
 	var summaryIndicator = 0 //sluzi za povecanje summaryCount u situacijama kad se zapis prelama
@@ -232,7 +239,7 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 				blocks[indexOfBlock].Records = append(blocks[indexOfBlock].Records, recordBytes[0:tempBlockSize]...)
 				//recordSize -= uint32(tempBlockSize)
 				pos = tempBlockSize
-				tempBlockSize = data.BlockSize //jer je blok popunjen do kraja
+				tempBlockSize = sst.BlockSize //jer je blok popunjen do kraja
 				indicator = 'm'
 				break
 				//} else { //ako zapis ne moze stati u blok koji vec ima nesto u sebi, popunjavamo ostatak nulama
@@ -254,7 +261,7 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 			} else if indicator == 'm' { //middle gigant
 				//recordSize = recordSize - BlockSize
 				recordSize = recordSize - uint64(pos)
-				if recordSize < data.BlockSize { //ako ostatak zapisa moze stati u taj blok to je poslednji dio zapisa l''
+				if recordSize < sst.BlockSize { //ako ostatak zapisa moze stati u taj blok to je poslednji dio zapisa l''
 					indicator = 'l'
 					//recordBytes := recordToBytes(records[i], recordSize, indicator)
 					blocks[indexOfBlock].Records = append(blocks[indexOfBlock].Records, recordBytes[pos:]...)
@@ -264,7 +271,7 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 					indicator = 'a' //resetovanje indikatora
 					tempBlockSize -= recordSize
 					if tempBlockSize == 0 {
-						tempBlockSize = data.BlockSize
+						tempBlockSize = sst.BlockSize
 					}
 					pos += recordSize
 					//padding := make([]byte, BlockSize-recordSize) //preostali prostor se popuni paddingom
@@ -277,14 +284,14 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 					//recordBytes := recordToBytes(records[i], recordSize, indicator)
 					summaryIndicator = 1
 					indexIndicator = 1
-					blocks[indexOfBlock].Records = append(blocks[indexOfBlock].Records, recordBytes[pos:data.BlockSize+pos]...)
+					blocks[indexOfBlock].Records = append(blocks[indexOfBlock].Records, recordBytes[pos:sst.BlockSize+pos]...)
 					//bilo ...append(blocks[indexOfBlock].records, recordBytes[pos:BlockSize]...)
-					pos = pos + data.BlockSize
-					tempBlockSize = data.BlockSize
+					pos = pos + sst.BlockSize
+					tempBlockSize = sst.BlockSize
 					break //prelazimo na sledeci blok
 				}
 
-			} else if recordSize == data.BlockSize && indicator != 'm' { //OVO SE NIKAD NE DESAVA
+			} else if recordSize == sst.BlockSize && indicator != 'm' { //OVO SE NIKAD NE DESAVA
 				indicator = 'a'
 				if t == 'd' {
 					recordBytes = sst.DataSegment.RecordToBytes(records[i], recordSize, indicator)
@@ -294,7 +301,7 @@ func (sst *SSTable) MakeBlocks(t byte, records []*data.Record) {
 					recordBytes = sst.Index.recordToBytes(records[i], recordSize, offsetSummary)
 				}
 				blocks[indexOfBlock].Records = append(blocks[indexOfBlock].Records, recordBytes...)
-				tempBlockSize = data.BlockSize
+				tempBlockSize = sst.BlockSize
 				i += 1
 
 			} else {
@@ -430,7 +437,7 @@ func (sst *SSTable) SearchSummary(key string) int64 {
 }
 
 func (sst *SSTable) SearchIndex(key string, offset int64) int64 {
-	startBlock := offset / int64(data.BlockSize) //racunanje bloka od kog krece pretraga na osnovu offseta
+	startBlock := offset / int64(sst.BlockSize) //racunanje bloka od kog krece pretraga na osnovu offseta
 	// if offset%int32(BlockSize) != 0 {
 	// 	startBlock++
 	// }
@@ -452,7 +459,7 @@ func (sst *SSTable) SearchIndex(key string, offset int64) int64 {
 		// racunamo pocetnu poziciju samo za prvi blok, za svaki sledeci pocinjemo od nulte pozicije
 		pos := int64(0)
 		if currentBlock == startBlock {
-			pos = offset % int64(data.BlockSize)
+			pos = offset % int64(sst.BlockSize)
 		}
 
 		for pos < int64(len(buffer)) { //prolazak kroz jedan blok
@@ -554,7 +561,7 @@ func (sst *SSTable) SearchIndex(key string, offset int64) int64 {
 }
 
 func (sst *SSTable) SearchData(key string, offset int64) []byte {
-	startBlock := offset / int64(data.BlockSize) //racunanje bloka od kog krece pretraga na osnovu offseta
+	startBlock := offset / int64(sst.BlockSize) //racunanje bloka od kog krece pretraga na osnovu offseta
 	currentBlock := startBlock
 	readIndicator := -1   //koristi se za identifikovnje da li se cita keySize(0), key(1), offset(2), pocetno stanje(-1)
 	var helpBuffer []byte //koristi se za bajtove zapisa koji se prelamaju u sledeci blok
@@ -574,7 +581,7 @@ func (sst *SSTable) SearchData(key string, offset int64) []byte {
 		// racunamo pocetnu poziciju samo za prvi blok, za svaki sledeci pocinjemo od nulte pozicije
 		pos := int64(0)
 		if currentBlock == startBlock {
-			pos = offset % int64(data.BlockSize)
+			pos = offset % int64(sst.BlockSize)
 		}
 
 		for pos < int64(len(buffer)) { //prolazak kroz jedan blok
@@ -593,8 +600,8 @@ func (sst *SSTable) SearchData(key string, offset int64) []byte {
 				helpBuffer = nil
 			} else if readIndicator == 2 { // u pomocnom baferu je ostatak value
 				remainingSize = int(valueSize) - len(helpBuffer) //velicina ostatka value
-				if remainingSize > int(data.BlockSize) {         //value se prelama kroz vise blokova
-					helpBuffer = append(helpBuffer, buffer[:data.BlockSize]...)
+				if remainingSize > int(sst.BlockSize) {          //value se prelama kroz vise blokova
+					helpBuffer = append(helpBuffer, buffer[:sst.BlockSize]...)
 					break
 				} else {
 					helpBuffer = append(helpBuffer, buffer[:remainingSize]...)

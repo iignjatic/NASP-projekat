@@ -1,8 +1,11 @@
 {
   "BlockSize": 70,
-  "MemTableSize": 30,
+  "BlocksPerSegment": 4,
+  "MemTableSize": 3,
   "MemTableCount": 2,
   "MemTableType": "hashmap",
   "CacheSize": 10,
-  "SummarySample": 5
+  "SummarySample": 5,
+  "MaxTokens": 10,
+  "ResetInterval": 30
 }

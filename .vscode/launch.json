@@ -8,9 +8,13 @@
       "name": "Launch",
       "type": "go",
       "request": "launch",
-      "mode": "auto",
+      "mode": "debug",
       "program": "${workspaceFolder}/main/main.go",
-      "cwd": "${workspaceFolder}/main", 
+      "console": "integratedTerminal",
+      "buildFlags": "-gcflags=all=-N -gcflags=all=-l",
+      "showGlobalVariables": true,
+      "trace": "verbose",
+      "cwd": "${workspaceFolder}/main"
     }
   ]
 }

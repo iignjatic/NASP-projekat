@@ -1,11 +1,11 @@
 package wal
 
 import (
+	"NASP-PROJEKAT/BlockManager"
 	"NASP-PROJEKAT/data"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,24 +14,41 @@ import (
 )
 
 const DIRECTORY_PATH = "../wal/segments"
-const HELPER_PATH = "wal/helper"
 
-type Wal struct {
-	DirectoryPath  string     // directory where Segments are stored
-	HelperPath		string
-	Segments       []*Segment // array of Segments that are not saved
-	CurrentSegment *Segment   // current active segment
-	SegmentPaths   []string   // list of all segment paths
+type FragmentKey struct {
+	Key       string
+	Timestamp string
 }
 
-func NewWal() *Wal {
+type Position struct {
+	SegmentID int
+	Offset    int
+	Size      int
+}
+
+type Wal struct {
+	DirectoryPath    string
+	Segments         []*Segment
+	CurrentSegment   *Segment
+	SegmentPaths     []string
+	recordPositions  map[FragmentKey][]Position
+	blockSize        uint64
+	blocksPerSegment uint64
+	blockManager     *BlockManager.BlockManager
+}
+
+func NewWal(bm *BlockManager.BlockManager, blockSize, blocksPerSegment uint64) *Wal {
 	w := &Wal{
-		DirectoryPath:  DIRECTORY_PATH,
-		HelperPath: HELPER_PATH,
-		Segments:       []*Segment{},
-		CurrentSegment: nil,
-		SegmentPaths:   []string{},
+		DirectoryPath:    DIRECTORY_PATH,
+		Segments:         []*Segment{},
+		CurrentSegment:   nil,
+		SegmentPaths:     []string{},
+		recordPositions:  make(map[FragmentKey][]Position),
+		blockSize:        blockSize,
+		blocksPerSegment: blocksPerSegment,
+		blockManager:     bm,
 	}
+
 	w.AddNewSegment()
 	return w
 }
@@ -47,8 +64,10 @@ func (w *Wal) AddNewSegment() {
 	// get the last segment
 	var lastSegment string
 	if len(segmentNames) == 0 {
-		newSegmentID := len(segmentNames)
-		newSegment := NewSegment(newSegmentID)
+		newSegmentID := 0
+		newSegment := NewSegment(newSegmentID, w.blockSize, w.blocksPerSegment)
+		firstBlock := NewBlock(0, w.blockSize)
+		newSegment.Blocks = append(newSegment.Blocks, firstBlock)
 		w.Segments = append(w.Segments, newSegment)
 		w.CurrentSegment = newSegment
 		w.SegmentPaths = append(w.SegmentPaths, newSegment.FilePath)
@@ -61,27 +80,32 @@ func (w *Wal) AddNewSegment() {
 	ifFull, err := w.ReadFirstByte(lastSegment)
 	if err != nil && ifFull != 0 && ifFull != 1 {
 		err := errors.New("cannot read the first byte")
-		fmt.Println("Error: ", err) 
+		fmt.Println("Error: ", err)
 		return
 	}
 
 	if ifFull == 0 {
 		// if the last segment is not full, make it current segment
 		segmentPath := filepath.Join(w.DirectoryPath, lastSegment)
-		records, err := w.ReadSegmentFromFile(segmentPath)
+		records, err := w.ReadSegmentFromFile(segmentPath, 0, false, false)
 		if err != nil {
 			fmt.Printf("Error reading records from segment %s: %v\n", segmentPath, err)
 			return
 		}
 		noZerosRecords := NoZerosRecords(records)
-		defragmentedRecords := DefragmentRecords(noZerosRecords)
+		// defragmentedRecords := DefragmentRecords(noZerosRecords)
 
 		// create the segment and add records to it
 		// last := w.SegmentPaths[len(w.SegmentPaths)-1]
-		lastUsedSegment := NewSegment(len(w.SegmentPaths)-1)
+		segmentID := ExtractSegmentNumber(lastSegment)
+		lastUsedSegment := NewSegment(segmentID, w.blockSize, w.blocksPerSegment)
 		w.Segments = append(w.Segments, lastUsedSegment)
 		w.CurrentSegment = lastUsedSegment
-		for _, record := range defragmentedRecords {
+		if len(lastUsedSegment.Blocks) == 0 {
+			firstBlock := NewBlock(0, w.blockSize)
+			lastUsedSegment.Blocks = append(lastUsedSegment.Blocks, firstBlock)
+		}
+		for _, record := range noZerosRecords {
 			rec := data.NewRecord(record.Key, append([]byte{}, record.Value...))
 			if record.Type == 'f' {
 				rec.Type = 'f'
@@ -98,7 +122,9 @@ func (w *Wal) AddNewSegment() {
 	} else {
 		last := w.SegmentPaths[len(w.SegmentPaths)-1]
 		newSegmentID := ExtractSegmentNumber(last) + 1
-		newSegment := NewSegment(newSegmentID)
+		newSegment := NewSegment(newSegmentID, w.blockSize, w.blocksPerSegment)
+		firstBlock := NewBlock(0, w.blockSize)
+		newSegment.Blocks = append(newSegment.Blocks, firstBlock)
 		w.Segments = append(w.Segments, newSegment)
 		w.CurrentSegment = newSegment
 		w.SegmentPaths = append(w.SegmentPaths, newSegment.FilePath)
@@ -109,7 +135,7 @@ func (w *Wal) AddNewSegment() {
 func (w *Wal) ReadSegmentNames() ([]string, error) {
 	files, err := os.ReadDir(w.DirectoryPath)
 	if err != nil {
-		return nil, fmt.Errorf("error reading directory: %v", err)  
+		return nil, fmt.Errorf("error reading directory: %v", err)
 	}
 	var segmentNames []string
 	for _, file := range files {
@@ -132,8 +158,8 @@ func (w *Wal) ReadSegmentNames() ([]string, error) {
 
 // return number from segment name
 func ExtractSegmentNumber(name string) int {
-	parts := strings.TrimPrefix(name, "wal_")	// starts with wal_
-	parts = strings.TrimSuffix(parts, ".bin") 	// ends with .bin
+	parts := strings.TrimPrefix(name, "wal_") // starts with wal_
+	parts = strings.TrimSuffix(parts, ".bin") // ends with .bin
 	num, err := strconv.Atoi(parts)
 	if err != nil {
 		return -1
@@ -153,156 +179,209 @@ func (w *Wal) FlushCurrentSegment() {
 
 // a function that writes records to the segment file
 func (w *Wal) WriteSegmentToFile(s *Segment) error {
-	if err := os.MkdirAll(w.DirectoryPath, os.ModePerm); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
 	filePath := w.DirectoryPath + "/" + s.FilePath
-	file, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
 
-	// reserve one byte for indicator of fullness of the segment
-	offset := []byte{0}
-	_, err = file.Write(offset)
-	if err != nil {
-		return err
+	if w.recordPositions == nil {
+		w.recordPositions = make(map[FragmentKey][]Position)
 	}
 
-	for i:=0;i<len(s.Blocks);i++ {
-		for j:=0;j<len(s.Blocks[i].Records);j++ {
-			recordBytes, err := s.Blocks[i].Records[j].ToBytes()
+	indicatorSize := uint64(1)
+	currentOffset := int(indicatorSize)
+
+	for i, walBlock := range s.Blocks {
+		dataBlock, err := ConvertWalBlockToDataBlock(walBlock)
+		if err != nil {
+			return fmt.Errorf("failed to convert wal block to data block: %w", err)
+		}
+
+		w.blockManager.WriteBlock(dataBlock, filePath, uint64(i), w.blockSize, indicatorSize)
+
+		for _, rec := range walBlock.Records {
+			recordBytes, err := rec.ToBytes()
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to serialize record: %w", err)
 			}
-			_, err = file.Write(recordBytes)
-			if err != nil {
-				return err
+
+			key := FragmentKey{Key: rec.Key, Timestamp: rec.Timestamp}
+			pos := Position{
+				SegmentID: s.ID,
+				Offset:    currentOffset,
+				Size:      len(recordBytes),
 			}
+			w.recordPositions[key] = append(w.recordPositions[key], pos)
+			currentOffset += len(recordBytes)
 		}
 	}
 	return nil
 }
 
-// just change the fist or the second byte to one if the segment is full or if the segment is sent to SSTable
 func (w *Wal) WriteFirstByte(s *Segment) error {
-	file, err := os.OpenFile(w.DirectoryPath + "/" + s.FilePath, os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.Seek(0, io.SeekStart)
-	if err != nil {
-		return fmt.Errorf("failed to seek to beginning of the file: %w", err)
-	}
-	offset := []byte{1}
-	_, err = file.Write(offset)
-	if err != nil {
-		return err
-	}
-	return nil
+	filePath := w.DirectoryPath + "/" + s.FilePath
+	return w.blockManager.WriteIndicatorByte(filePath, 1)
 }
 
-// a function that reads the whole segment record by record, or from a particular position in the file
-func (w *Wal) ReadSegmentFromFile(filePath string) ([]*data.Record, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
-	}
-	defer file.Close()
-
-	// move the pointer to the first byte - first byte is for fullness of the file
-	_, err = file.Seek(1, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("failed to seek to the first byte: %w", err)
-	}
-
-	var records []*data.Record
-	buffer := make([]byte, BLOCK_SIZE)
-	var data1 []byte
-
-	for {
-		n, err := file.Read(buffer)
-		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("failed to read file: %w", err)
+func ConvertWalBlockToDataBlock(wb *Block) (*data.Block, error) {
+	var allBytes []byte
+	for _, rec := range wb.Records {
+		b, err := rec.ToBytes()
+		if err != nil {
+			return nil, err
 		}
-		if n == 0 {
+		allBytes = append(allBytes, b...)
+	}
+	return &data.Block{Records: allBytes}, nil
+}
+
+func (w *Wal) ReadSegmentFromFile(filePath string, offset int64, useCheckpoint bool, revoked bool) ([]*data.Record, error) {
+	if !useCheckpoint {
+		offset = 1
+	}
+
+	segmentID := ExtractSegmentNumber(filepath.Base(filePath))
+	var records []*data.Record
+	var data1 []byte
+	currentOffset := int(offset)
+
+	blockNumber := uint64(offset) / w.blockSize
+	innerOffset := offset % int64(w.blockSize)
+	for {
+		buffer, err := w.blockManager.ReadWalBlock(filePath, blockNumber, innerOffset)
+		if err != nil {
+			return nil, err
+		}
+		if len(buffer) == 0 {
 			break
 		}
-		
-		// handles leftovers
-		data1 = append(data1, buffer[:n]...)
 
-		i:=0
-		for i<len(data1) {
+		data1 = append(data1, buffer...)
+
+		i := 0
+		for i < len(data1) {
+			for i < len(data1) && data1[i] == 0 {
+				i++
+			}
+			minHeaderSize := data.KEY_START
+			if len(data1[i:]) < minHeaderSize {
+				break
+			}
+
+			keySize := binary.LittleEndian.Uint64(data1[i+data.KEY_SIZE_START:])
+			valueSize := binary.LittleEndian.Uint64(data1[i+data.VALUE_SIZE_START:])
+			totalSize := data.KEY_START + int(keySize) + int(valueSize)
+
+			j := i
+			for j+totalSize < len(data1) && data1[j+totalSize] == 0 {
+				j++
+				currentOffset++
+			}
+
+			if len(data1[i:]) < totalSize {
+				break
+			}
+
 			record, err := data.FromBytes(data1[i:])
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse record at position %d: %w",i, err)
+				return nil, fmt.Errorf("failed to parse record at position %d: %w", i, err)
 			}
 			records = append(records, record)
+
 			recordBytes, err := record.ToBytes()
 			if err != nil {
 				return nil, fmt.Errorf("failed to serialize record to bytes: %w", err)
 			}
+			if revoked {
+				key := FragmentKey{
+					Key:       record.Key,
+					Timestamp: record.Timestamp,
+				}
+				pos := Position{
+					SegmentID: segmentID,
+					Offset:    currentOffset,
+					Size:      len(recordBytes),
+				}
+				w.recordPositions[key] = append(w.recordPositions[key], pos)
+			}
+			currentOffset += len(recordBytes)
 			i += len(recordBytes)
 		}
+
 		data1 = data1[i:]
+		blockNumber++
 	}
 	return records, nil
 }
 
 func (w *Wal) ReadFirstByte(segmentPath string) (byte, error) {
-	file, err := os.OpenFile(w.DirectoryPath + "/" + segmentPath, os.O_RDONLY, 0644)
-	if err != nil {
-		return 2, err
-	}
-	defer file.Close()
-
-	buffer := make([]byte, 1)
-	_, err = file.Read(buffer)
-	if err != nil {
-		return 2, fmt.Errorf("failed to read first byte: %w", err)
-	}
-	return buffer[0], nil
+	filePath := w.DirectoryPath + "/" + segmentPath
+	return w.blockManager.ReadIndicatorByte(filePath)
 }
 
-// for testing functionality of segmentation
-func (w *Wal) ReadAllSegments() ([]*data.Record, error) {
+func (w *Wal) ReadAllSegmentsCP(rev bool) ([]*data.Record, error) {
 	var allRecords []*data.Record
+
+	// load the checkpoint
+	cp, err := LoadCheckpointFromFlushInfo()
+	if err != nil {
+		return nil, fmt.Errorf("cannot laod the checkpoint: %w", err)
+	}
+
+	// read all segments
 	segmentNames, err := w.ReadSegmentNames()
 	if err != nil {
 		return nil, err
 	}
-	if len(segmentNames) != 0 {
-		for _, segmentName := range segmentNames {
-			segmentPath := filepath.Join(w.DirectoryPath, segmentName)
-			records, err := w.ReadSegmentFromFile(segmentPath)
-			if err != nil {
-				fmt.Printf("Error reading records from segment %s: %v\n", segmentPath, err)
-				continue
-			}
-			allRecords = append(allRecords, records...)
+
+	// go through all the segments
+	for _, segmentName := range segmentNames {
+		segmentID := ExtractSegmentNumber(segmentName)
+		segmentPath := filepath.Join(w.DirectoryPath, segmentName)
+
+		if segmentID < cp.SegmentEnd {
+			// segment is fully flushed, skip
+			continue
 		}
+
+		var records []*data.Record
+		if segmentID == cp.SegmentEnd {
+			// segment is partially flushed
+			records, err = w.ReadSegmentFromFile(segmentPath, int64(cp.OffsetEnd), true, rev)
+		} else {
+			// read the whole segment
+			records, err = w.ReadSegmentFromFile(segmentPath, 0, false, rev)
+		}
+
+		if err != nil {
+			fmt.Printf("Error reading the segment %s: %v\n", segmentPath, err)
+			continue
+		}
+
+		allRecords = append(allRecords, records...)
 	}
+
 	noZerosRecords := NoZerosRecords(allRecords)
 	defragmentedRecords := DefragmentRecords(noZerosRecords)
+
 	return defragmentedRecords, nil
 }
 
 func NoZerosRecords(r []*data.Record) []*data.Record {
-	for i:=0; i<len(r); i++ {
+	for i := 0; i < len(r); i++ {
 		r[i].Value = TrimZeros(r[i].Value)
 		r[i].ValueSize = uint64(len(r[i].Value))
 	}
 	return r
 }
 
+func NoZerosRecord(r *data.Record) *data.Record {
+	r.Value = TrimZeros(r.Value)
+	r.ValueSize = uint64(len(r.Value))
+	return r
+}
+
 func DefragmentRecords(r []*data.Record) []*data.Record {
-	var temp []*data.Record 
+	var temp []*data.Record
 	record := data.NewRecord("", []byte(""))
-	for i:=0; i< len(r); i++ {
+	for i := 0; i < len(r); i++ {
 		if r[i].Type == 'a' {
 			temp = append(temp, r[i])
 		} else if r[i].Type == 'f' {
@@ -316,11 +395,15 @@ func DefragmentRecords(r []*data.Record) []*data.Record {
 			record.Value = append(record.Value, r[i].Value...)
 		}
 		if r[i].Type == 'm' {
-			record.Value = append(record.Value, r[i].Value...  )
+			record.Value = append(record.Value, r[i].Value...)
 			record.ValueSize += r[i].ValueSize
 		} else if r[i].Type == 'l' {
 			record.Value = append(record.Value, r[i].Value...)
 			record.ValueSize += r[i].ValueSize
+			_, err := record.ToBytes()
+			if err != nil {
+				fmt.Printf("Error recalculating crc in record defragmentation: %v\n", err)
+			}
 			temp = append(temp, record)
 			record = data.NewRecord("", []byte(""))
 		}
@@ -328,77 +411,45 @@ func DefragmentRecords(r []*data.Record) []*data.Record {
 	return temp
 }
 
-// calculates the number of bytes sent to SSTable
-func NumberOfBytesSent(records []*data.Record) int {
-	var numberOfBytesSent int = 0
-	for _, r := range records {
-		numberOfBytesSent += data.CalculateRecordSize(r)
-	}
-	return numberOfBytesSent
-}
-
-// deleting after sent to SSTable
-func (w *Wal) DeleteSegments(numberOfBytesSent int) error {
-	segmentNames, err := w.ReadSegmentNames()
-	if err != nil {
-		return err
-	}
-	if len(segmentNames) == 0 { 
-		return nil
-	}
-	// calculate the number of segments that have to be deleted
-	numberOfSegmentsToDelete := numberOfBytesSent / (SEGMENT_SIZE + 1)
-	remainder := numberOfBytesSent % (SEGMENT_SIZE + 1)
-
-	// delete segments
-	for i:=0; i < numberOfSegmentsToDelete; i++ {
-		segmentPath := w.DirectoryPath + "/" + segmentNames[i]
-		DeleteSegment(segmentPath)
-	}
-
-	// if there is the remainder, save it for system crush
-	if remainder > 0 {
-		err := w.SaveRemainder(remainder)
-		if err != nil {
-			return err
+func (w *Wal) DeleteFullyFlushedSegments(info Flush) error {
+	for i := 0; i < len(w.SegmentPaths); {
+		path := w.SegmentPaths[i]
+		id := ExtractSegmentNumber(path)
+		if id < 0 {
+			i++
+			continue
 		}
+
+		fullPath := filepath.Join(w.DirectoryPath, path)
+
+		shouldDelete := false
+
+		if id < info.SegmentEnd {
+			shouldDelete = true
+		} else if id == info.SegmentEnd {
+			fileInfo, err := os.Stat(fullPath)
+			if err != nil {
+				fmt.Printf("error checking %s: %v\n", path, err)
+				i++
+				continue
+			}
+			if info.OffsetEnd >= int(fileInfo.Size()) {
+				shouldDelete = true
+			}
+		}
+
+		if shouldDelete {
+			err := os.Remove(fullPath)
+			if err != nil {
+				fmt.Printf("error deleting %s: %v\n", path, err)
+			} else {
+				fmt.Printf("Segment deleted: %s\n", path)
+
+				w.SegmentPaths = append(w.SegmentPaths[:i], w.SegmentPaths[i+1:]...)
+				continue
+			}
+		}
+		i++
 	}
 	return nil
-}
-
-func (w *Wal) SaveRemainder(remainder int) error {
-	file, err := os.Create(w.HelperPath + "/remainder.bin")
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	buffer := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buffer, uint32(remainder))
-
-	_, err = file.Write(buffer)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (w *Wal) ReadRemainder() (int, error) {
-	file, err := os.Open(w.HelperPath + "/remainder.bin")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	defer file.Close()
-
-	buffer := make([]byte, 4)
-	_, err = file.Read(buffer)
-	if err != nil {
-		return 0, err
-	}
-
-	remainder := int(binary.LittleEndian.Uint32(buffer))
-	return remainder, nil
 }

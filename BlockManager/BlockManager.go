@@ -3,12 +3,15 @@ package BlockManager
 import (
 	"NASP-PROJEKAT/BlockCache"
 	"NASP-PROJEKAT/data"
+	"fmt"
+	"io"
 	"os"
 	"strconv"
 )
 
 type BlockManager struct {
 	BlockCache BlockCache.BlockCache
+	BlockSize  uint64
 }
 
 //func (blockManager *BlockManager) writeBlock(block *Block, filePath string, numberOfBlock uint32) {
@@ -55,8 +58,8 @@ func (BlockManager *BlockManager) ReadBlock(filePath string, numberOfBlock uint6
 		}
 		defer file.Close()
 
-		buffer = make([]byte, data.BlockSize) //u bafer ce biti ucitani podaci koje vraca funkcija
-		offset := int64(numberOfBlock)*int64(data.BlockSize) + int64(metaSummary)
+		buffer = make([]byte, BlockManager.BlockSize) //u bafer ce biti ucitani podaci koje vraca funkcija
+		offset := int64(numberOfBlock)*int64(BlockManager.BlockSize) + int64(metaSummary)
 		_, err = file.ReadAt(buffer, offset)
 		//readAt cita onoliko bajtova koliko moze da stane u bafer a to je velicina jednog bloka
 		//cita sa pozicije u datoteci koja je drugi parametar funkcije
@@ -69,4 +72,51 @@ func (BlockManager *BlockManager) ReadBlock(filePath string, numberOfBlock uint6
 		BlockManager.BlockCache.AddCache(strconv.Itoa(int(numberOfBlock))+filePath, block)
 	}
 	return buffer, nil
+}
+
+func (bm *BlockManager) WriteIndicatorByte(filePath string, indicator byte) error {
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.WriteAt([]byte{indicator}, 0)
+	return err
+}
+
+func (bm *BlockManager) ReadIndicatorByte(filePath string) (byte, error) {
+	file, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+	buffer := make([]byte, 1)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return 0, err
+	}
+	return buffer[0], nil
+}
+
+func (blockManager *BlockManager) ReadWalBlock(filePath string, blockNumber uint64, metaSummary int64) ([]byte, error) {
+    file, err := os.Open(filePath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
+    }
+    defer file.Close()
+
+    offset := int64(blockNumber)*int64(blockManager.BlockSize) + metaSummary
+
+    _, err = file.Seek(offset, io.SeekStart)
+    if err != nil {
+        return nil, fmt.Errorf("failed to seek to block %d in file %s: %w", blockNumber, filePath, err)
+    }
+
+    buffer := make([]byte, blockManager.BlockSize)
+    n, err := file.Read(buffer)
+    if err != nil && err != io.EOF {
+        return nil, fmt.Errorf("failed to read block %d in file %s: %w", blockNumber, filePath, err)
+    }
+
+    return buffer[:n], nil
 }

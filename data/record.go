@@ -27,7 +27,7 @@ const (
 
 /*
    +---------------+-----------------+---------------+------+---------------+----------+-------+-...-+--...--+
-   |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Type | Key Size (8B) | Value Size (8B) | Key | Value |
+   |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Type(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
    +---------------+-----------------+---------------+------+---------------+----------+-------+-...-+--...--+
    CRC = 32bit hash computed over the payload using CRC
    Key Size = Length of the Key data
@@ -51,8 +51,8 @@ type Record struct {
 }
 
 func NewRecord(key string, value []byte) *Record {
-	timestamp := fmt.Sprintf("%d", time.Now().UTC().Unix())
-	return &Record{
+	timestamp := fmt.Sprintf("%d", time.Now().UTC().UnixNano())
+	rec := &Record{
 		Crc:       0, // computed during serialization
 		Timestamp: timestamp,
 		Tombstone: false, // default value
@@ -62,15 +62,23 @@ func NewRecord(key string, value []byte) *Record {
 		Key:       key,
 		Value:     value,
 	}
+	rec.ToBytes()
+	return rec
 }
 
 func CRC32(data []byte) uint32 {
-	return crc32.ChecksumIEEE(data)
+	// fmt.Printf("CRC input data: %v\n", data)
+	crc := crc32.ChecksumIEEE(data)
+	// fmt.Printf("Calculated CRC: %d\n", crc)
+	return crc
 }
 
 func (r *Record) ToBytes() ([]byte, error) {
 	keySize := len(r.Key)
 	valueSize := len(r.Value)
+
+	realValueSize := len(TrimZeros(r.Value))
+	totalCRCValue := KEY_START + keySize + realValueSize
 
 	// Compute total size of the byte array
 	totalSize := KEY_START + keySize + valueSize
@@ -98,14 +106,14 @@ func (r *Record) ToBytes() ([]byte, error) {
 
 	// Serialize KeySize and ValueSize
 	binary.LittleEndian.PutUint64(bytesArray[KEY_SIZE_START:], uint64(keySize))
-	binary.LittleEndian.PutUint64(bytesArray[VALUE_SIZE_START:], uint64(valueSize))
+	binary.LittleEndian.PutUint64(bytesArray[VALUE_SIZE_START:], uint64(realValueSize))
 
 	// Serialize Key and Value
 	copy(bytesArray[KEY_START:], r.Key)
 	copy(bytesArray[KEY_START+keySize:], r.Value)
 
 	// Compute CRC
-	crc := CRC32(bytesArray[CRC_SIZE:])
+	crc := CRC32(bytesArray[CRC_SIZE:totalCRCValue])
 	r.Crc = crc
 	binary.LittleEndian.PutUint32(bytesArray[CRC_START:], crc)
 
@@ -178,8 +186,9 @@ func FromBytes(data []byte) (*Record, error) {
 	}
 	value := data[valueStart : valueStart+int(valueSize)]
 
+	realValueSize := len(TrimZeros(value))
 	// Compare old and new CRC
-	calculatedCrc := CRC32(data[CRC_SIZE : valueStart+int(valueSize)])
+	calculatedCrc := CRC32(data[CRC_SIZE : valueStart+int(realValueSize)])
 	if crc != calculatedCrc {
 		return nil, fmt.Errorf("crc mismatch: expected %d, got %d", crc, calculatedCrc)
 	}
@@ -198,4 +207,31 @@ func FromBytes(data []byte) (*Record, error) {
 
 func CalculateRecordSize(record *Record) int {
 	return KEY_START + len(record.Key) + len(record.Value)
+}
+
+func TrimZeros(data []byte) []byte {
+	for len(data) > 0 && data[len(data)-1] == 0 {
+		data = data[:len(data)-1]
+	}
+	return data
+}
+
+func DeepCopyRecord(original *Record) *Record {
+	if original == nil {
+		return nil
+	}
+
+	copyValue := make([]byte, len(original.Value))
+	copy(copyValue, original.Value)
+
+	return &Record{
+		Crc:       original.Crc,
+		Timestamp: original.Timestamp,
+		Tombstone: original.Tombstone,
+		Type:      original.Type,
+		KeySize:   original.KeySize,
+		ValueSize: original.ValueSize,
+		Key:       original.Key,
+		Value:     copyValue,
+	}
 }
