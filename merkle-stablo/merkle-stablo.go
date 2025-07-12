@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+
 	"os"
 )
 
@@ -160,6 +161,7 @@ func DeserializeMerkleTree(file *os.File) (*MerkleNode, error) {
 	if err != nil {
 		return nil, err
 	}
+	//fmt.Println("Ovo je serijalizovani root hash direktno iz funkcije DeserializeMerkleTree:", root.Hash)
 	return root, nil
 }
 

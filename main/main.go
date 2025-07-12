@@ -10,6 +10,7 @@ import (
 	merkleStablo "NASP-PROJEKAT/merkle-stablo"
 	"NASP-PROJEKAT/tokenBucket"
 	"NASP-PROJEKAT/wal"
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -112,11 +113,11 @@ func main() {
 	files, _ := ioutil.ReadDir("../SSTable/files")
 	numOfSSTables := len(files) / 3
 
-	var input uint32
-	var key string
+	//var input uint32
+	//var key string
 	var value []byte
 
-	var sstableName string
+	//var sstableName string
 	const tokenBucketKey = "token_bucket"
 	tb := &tokenBucket.TokenBucket{}
 
@@ -155,7 +156,7 @@ func main() {
 	found := false
 
 	if record, _ := memtable.Get(tokenBucketKey); record != nil {
-		fmt.Println("Zapis je pronadjen : ", string(value))
+		//fmt.Println("Zapis je pronadjen : ", string(value))
 		found = true
 		//fmt.Println("TOKENBUCKET JE PRONADJEN U SISTEMU PRILIKOM POKRETANJA PROGRAMA U MEMTABELI")
 	}
@@ -165,7 +166,7 @@ func main() {
 
 	if !found {
 		if value = recordCache.Get(tokenBucketKey); value != nil {
-			fmt.Println("Zapis je pronadjen : ", value)
+			//fmt.Println("Zapis je pronadjen : ", value)
 			//fmt.Println("TOKENBUCKET JE PRONADJEN U SISTEMU PRILIKOM POKRETANJA PROGRAMA U RECORDCACHE")
 			found = true
 		}
@@ -207,7 +208,7 @@ func main() {
 				//	fmt.Println("TOKENBUCKET JE OBRISAN IZ SISTEMA VIDJENO PREKO SSTABLE PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA")
 				break
 			} else {
-				fmt.Println("Zapis je pronadjen : ", string(value))
+				//fmt.Println("Zapis je pronadjen : ", string(value))
 				recordCache.Put(tokenBucketKey, value)
 				//fmt.Println("STA SAM PISAO U RECORDCACHE KAD SAM GA UPDATOVAO POSLE SSTABLE PRILIKOM GET ZA TOKENBUCKET PRILIKOM POKRETANJA PROGRAMA ", string(value))
 				//update CACHE!!!!!!!!!!!!!!!!!!
@@ -218,7 +219,7 @@ func main() {
 
 		}
 		if value == nil {
-			fmt.Println("Zapis nije pronadjen")
+			//fmt.Println("Zapis nije pronadjen")
 			//fmt.Println("TOKENBUCKET NIJE PRONADJEN U SISTEMU PRILIKOM TRAZENJA KADA SE POKRENE APLIKACIJA U SSTABLE")
 		}
 	}
@@ -248,13 +249,13 @@ func main() {
 			panic(err)
 		}
 
-		if len(flushedRecords) > 0 {
-			for i, record := range flushedRecords {
-				fmt.Printf("Element %d: %+v\n", i, record)
-			}
-		} else {
-			fmt.Printf("Prazan niz")
-		}
+		// if len(flushedRecords) > 0 {
+		// 	for i, record := range flushedRecords {
+		// 		fmt.Printf("Element %d: %+v\n", i, record)
+		// 	}
+		// } else {
+		// 	fmt.Printf("Prazan niz")
+		// }
 
 		recordCache.Put(tokenBucketKey, tokenBucketState) // ovdje sam dodao upis u recordCache
 		//	fmt.Println("TOKENBUCKET JE DODAT U SISTEM PRILIKOM POKRETANJA APLIKACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO TOKENBUCKET STATE ", tokenBucketState)
@@ -358,8 +359,17 @@ func main() {
 		fmt.Println("3. DELETE [ key ]")
 		fmt.Println("4. PROVJERA INTEGRITETA PODATAKA [ naziv  SSTable-a npr. sstable_1]")
 
+		reader := bufio.NewReader(os.Stdin)
+		num, _ := reader.ReadString('\n')
+		num = strings.TrimSpace(num)
+
+		input, err := strconv.Atoi(num)
+		if err != nil {
+			fmt.Println("Greška: nije broj.")
+			return
+		}
 		//fmt.Scan(&input)
-		input = 3
+		//input = 3
 
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// RADIM GET ZA TOKENBUCKET
@@ -368,7 +378,7 @@ func main() {
 		var tokenBucketStateValue []byte
 
 		if record, _ := memtable.Get(tokenBucketKey); record != nil {
-			fmt.Println("Zapis je pronadjen : ", string(value))
+			//fmt.Println("Zapis je pronadjen : ", string(value))
 			found = true
 			tmp, _ := memtable.Get(tokenBucketKey)
 			tokenBucketStateValue = tmp.Value
@@ -381,7 +391,7 @@ func main() {
 
 		if !found {
 			if value = recordCache.Get(tokenBucketKey); value != nil {
-				fmt.Println("Zapis je pronadjen : ", string(value))
+				//fmt.Println("Zapis je pronadjen : ", string(value))
 				found = true
 				tokenBucketStateValue = value
 				//fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U RECORDCACHE  TRAZIO SAM TOKENBUCKET I NASAO ", tokenBucketStateValue)
@@ -421,10 +431,10 @@ func main() {
 				if value == nil {
 					continue
 				} else if len(value) == 0 {
-					fmt.Println("Zapis je obrisan")
+					//fmt.Println("Zapis je obrisan")
 					break
 				} else {
-					fmt.Println("Zapis je pronadjen : ", string(value))
+					//fmt.Println("Zapis je pronadjen : ", string(value))
 					recordCache.Put(tokenBucketKey, value)
 					//update CACHE!!!!!!!!!!!!!!!!!!
 					found = true
@@ -435,7 +445,7 @@ func main() {
 
 			}
 			if value == nil {
-				fmt.Println("Zapis nije pronadjen")
+				//fmt.Println("Zapis nije pronadjen")
 			}
 		}
 
@@ -469,13 +479,13 @@ func main() {
 				panic(err)
 			}
 
-			if len(flushedRecords) > 0 {
-				for i, record := range flushedRecords {
-					fmt.Printf("Element %d: %+v\n", i, record)
-				}
-			} else {
-				fmt.Printf("Prazan niz")
-			}
+			// if len(flushedRecords) > 0 {
+			// 	for i, record := range flushedRecords {
+			// 		fmt.Printf("Element %d: %+v\n", i, record)
+			// 	}
+			// } else {
+			// 	fmt.Printf("Prazan niz")
+			// }
 
 			recordCache.Put(tokenBucketKey, updatedTokenBucketState) // ovdje sam dodao upis u recordCache
 			//fmt.Println("TOKENBUCKET JE AZURIRAN U SISTEMU PRILIKOM GET OPERACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO TOKENBUCKET STATE. ZNACI UPISUJE SE AZURIRANI TOKENBUCKET U SISTEM ", updatedTokenBucketState)
@@ -544,8 +554,6 @@ func main() {
 
 				dataSerializeFileName := metadataPath + "/merkle_tree" + strconv.Itoa(numOfSSTables) + ".bin"
 
-				// // NAPRAVI VALIDACIJU DA IDE PO FOLDERIMA KAKO TREBA DA UZIMA FAJLOVE
-
 				// // otvaranje fajla za pisanje
 				dataFile, err := os.Create(dataSerializeFileName)
 				if err != nil {
@@ -599,8 +607,11 @@ func main() {
 
 		if input == 1 {
 			//GET operacija
-
-			fmt.Scan(&key)
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print("Unesite ključ: ")
+			key, _ := reader.ReadString('\n')
+			key = strings.TrimSpace(key)
+			//fmt.Scan(&key)
 			//key = "key2"
 
 			if key == tokenBucketKey {
@@ -619,7 +630,7 @@ func main() {
 			if value = recordCache.Get(key); value != nil {
 				fmt.Println("Zapis je pronadjen : ", string(value))
 				//fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U RECORDCACHE")
-
+				continue
 			}
 
 			for i := numOfSSTables; i > 0; i-- { //prolazak kroz sve sstabele
@@ -672,7 +683,14 @@ func main() {
 
 		} else if input == 2 {
 			// put
-			fmt.Scan(&key, &value)
+			fmt.Print("Unesite ključ: ")
+			reader := bufio.NewReader(os.Stdin)
+			key, _ := reader.ReadString('\n')
+			key = strings.TrimSpace(key)
+			fmt.Print("Unesite vrijednost: ")
+			valueStr, _ := reader.ReadString('\n')
+			value = []byte(strings.TrimSpace(valueStr))
+			//fmt.Scan(&key, &value)
 
 			if key == tokenBucketKey {
 				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
@@ -751,8 +769,6 @@ func main() {
 
 				dataSerializeFileName := metadataPath + "/merkle_tree" + strconv.Itoa(numOfSSTables) + ".bin"
 
-				// // NAPRAVI VALIDACIJU DA IDE PO FOLDERIMA KAKO TREBA DA UZIMA FAJLOVE
-
 				// // otvaranje fajla za pisanje
 				dataFile, err := os.Create(dataSerializeFileName)
 				if err != nil {
@@ -792,7 +808,11 @@ func main() {
 
 		} else if input == 3 {
 			// delete
-			fmt.Scan(&key)
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print("Unesite ključ: ")
+			key, _ := reader.ReadString('\n')
+			key = strings.TrimSpace(key)
+			//fmt.Scan(&key)
 
 			if key == tokenBucketKey {
 				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
@@ -829,6 +849,14 @@ func main() {
 
 				numOfSSTables++
 				newSSTable := "sstable_" + strconv.Itoa(numOfSSTables)
+				metadataPath := "../SSTable/files/" + newSSTable + "/metadata" + strconv.Itoa(numOfSSTables)
+
+				err2 := os.MkdirAll(metadataPath, 0755)
+				if err2 != nil {
+					fmt.Println("Error creating metadata folder:", err)
+					return
+				}
+
 				sst := &SSTable.SSTable{
 					DataSegment:     dataSeg,
 					Index:           index,
@@ -844,6 +872,46 @@ func main() {
 				sst.Index = index
 				sst.Summary = summary
 				sst.WriteSSTable()
+
+				//fmt.Println("OVO JE PUTANJA")
+				//fmt.Println("../SSTable/files/" + newSSTable + "/data" + strconv.Itoa(numOfSSTables) + ".bin")
+				// //  ucitavanje blokova iz fajla
+				dataBlocks := dataSeg.BlocksToMerkle("../SSTable/files/" + newSSTable + "/data" + strconv.Itoa(numOfSSTables) + ".bin")
+
+				// // pravim listove stabla
+				dataLeafNodes := merkleStablo.CreateLeafNodes(dataBlocks)
+
+				//fmt.Println("OVO SU DATALEAFNODES")
+				//fmt.Println(dataLeafNodes)
+
+				//fmt.Println("JEL OVO OK ZA MERKLE STABLO")
+
+				// // 	//  pravim originalno Merkle stablo
+				dataOriginalRoot := merkleStablo.BuildMerkleTreeBottomUp(dataLeafNodes)
+
+				//fmt.Println("OVO JE DATAORIGINALROOT")
+				//fmt.Println(dataOriginalRoot)
+
+				// // kreiram MerkleTree objekat
+				//dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
+				//fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
+
+				dataSerializeFileName := metadataPath + "/merkle_tree" + strconv.Itoa(numOfSSTables) + ".bin"
+
+				// // NAPRAVI VALIDACIJU DA IDE PO FOLDERIMA KAKO TREBA DA UZIMA FAJLOVE
+
+				// // otvaranje fajla za pisanje
+				dataFile, err := os.Create(dataSerializeFileName)
+				if err != nil {
+					log.Fatalf("Greska pri kreiranju fajla: %v", err)
+				}
+				defer dataFile.Close() // Automatski zatvara fajl na kraju
+
+				// // serijalizacija Merkle stabla
+				err = merkleStablo.SerializeMerkleTree(dataOriginalRoot, dataFile)
+				if err != nil {
+					log.Fatalf("Greska pri serijalizaciji: %v", err)
+				}
 
 				flushInfo, err := w.CreateFlushInfo(flushedRecords)
 				if err != nil {
@@ -869,7 +937,10 @@ func main() {
 			}
 
 		} else if input == 4 {
-			fmt.Scan(&sstableName)
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print("Unesite ime SStabele [npr. sstable_1]: ")
+			sstableName, _ := reader.ReadString('\n')
+			sstableName = strings.TrimSpace(sstableName)
 
 			if sstableName == tokenBucketKey {
 				fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
@@ -896,6 +967,8 @@ func main() {
 
 			// 	//  Pravi se originalno Merkle stablo
 			dataOriginalRoot := merkleStablo.BuildMerkleTreeBottomUp(dataLeafNodes)
+			//fmt.Println("OVO JE KORIJENA NAPRAVLJENO SAD STABLA")
+			//fmt.Printf("Korjen hash-a: %x\n", dataOriginalRoot.Hash)
 
 			// Kreiranje MerkleTree objekta
 			dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
@@ -918,13 +991,15 @@ func main() {
 			}
 
 			//fmt.Printf("Korjen ucitanog stabla: %x\n", root.Hash)
+			//fmt.Printf("Korjen napravljenog sad stabla: %x\n", dataOriginalTree.Root.Hash)
 
 			if bytes.Equal(dataOriginalTree.Root.Hash, root.Hash) {
 				fmt.Println("Podaci su ispravni!")
 				continue
 			} else {
 				fmt.Println("Podaci su osteceni!")
-				diffIndex := merkleStablo.CompareTrees(root, dataOriginalTree.Root)
+				diffIndex := merkleStablo.CompareTrees(root, dataOriginalRoot)
+
 				if diffIndex != -1 {
 					fmt.Printf("Stabla se razlikuju na listu sa indeksom: %d\n", diffIndex)
 					continue
