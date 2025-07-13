@@ -155,7 +155,7 @@ func main() {
 
 	found := false
 
-	if record, _ := memtable.Get(tokenBucketKey); record != nil {
+	if _, exists, _ := memtable.Get(tokenBucketKey); exists {
 		//fmt.Println("Zapis je pronadjen : ", string(value))
 		found = true
 		//fmt.Println("TOKENBUCKET JE PRONADJEN U SISTEMU PRILIKOM POKRETANJA PROGRAMA U MEMTABELI")
@@ -377,10 +377,10 @@ func main() {
 		found := false
 		var tokenBucketStateValue []byte
 
-		if record, _ := memtable.Get(tokenBucketKey); record != nil {
+		if _, exists, _ := memtable.Get(tokenBucketKey); exists {
 			//fmt.Println("Zapis je pronadjen : ", string(value))
 			found = true
-			tmp, _ := memtable.Get(tokenBucketKey)
+			tmp, _, _ := memtable.Get(tokenBucketKey)
 			tokenBucketStateValue = tmp.Value
 			//fmt.Println("ZAPIS JE PRONADJEN U SISTEMU PRILIKOM GET OPERACIJE U MEMTABELI  TRAZIO SAM TOKENBUCKET I NASAO ", tokenBucketStateValue)
 
@@ -619,8 +619,12 @@ func main() {
 				continue
 			}
 
-			if record, _ := memtable.Get(key); record != nil {
-				fmt.Println("Zapis je pronadjen : ", string(value))
+			if record, exists, deleted := memtable.Get(key); exists {
+				if !deleted {
+					fmt.Println("Zapis je pronadjen: ", string(record.Value))
+				} else {
+					fmt.Println("Zapis je obrisan")
+				}
 				continue
 			}
 
