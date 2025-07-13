@@ -43,13 +43,14 @@ func (memt *MemtableHM) AddRecord(record *data.Record) error {
 }
 
 // dobavljenje recorda prema kljucu iz jedne memtabele
-func (memt *MemtableHM) Get(key string) (*data.Record, error) {
+// nezavisno od toga kakav je tombstone
+func (memt *MemtableHM) Get(key string) (*data.Record, bool) {
 	record, exist := memt.data[key]
-	if !exist || record.Tombstone {
-		return nil, errors.New("key not found")
+	if !exist {
+		return nil, false
 	}
 
-	return record, nil
+	return record, true
 }
 
 func (memt *MemtableHM) IsFull() bool {
@@ -188,18 +189,21 @@ func (mm *MemtableManagerHM) RotateMemtables() ([]*data.Record, error) {
 	return records, nil
 }
 
-func (mm *MemtableManagerHM) Get(key string) (*data.Record, error) {
+// krece se kroz tabele, od trenutno aktivne i provjerava da li record sa kljucem key postoji
+// povratna vrijednost: record, exists, deleted
+func (mm *MemtableManagerHM) Get(key string) (*data.Record, bool, bool) {
 	for i := 0; i < int(mm.maxTables); i++ {
 		index := (int(mm.acitveIndex) - i + int(mm.maxTables)) % int(mm.maxTables)
 		table := mm.tables[index]
-		if record, exists := table.data[key]; exists {
+		record, exists := table.Get(key)
+		if exists {
 			if record.Tombstone {
-				return nil, errors.New("key not found")
+				return nil, true, true // postoji, ali je obrisan
 			}
-			return record, nil
+			return record, true, false // postoji, validan record
 		}
 	}
-	return nil, errors.New("key not found")
+	return nil, false, false // ne postoji nigdje
 }
 
 func (mm *MemtableManagerHM) Delete(record *data.Record) ([]*data.Record, bool, error) {

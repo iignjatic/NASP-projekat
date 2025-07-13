@@ -6,7 +6,7 @@ import (
 )
 
 type Memtable interface {
-	Get(key string) (*data.Record, error)
+	Get(key string) (*data.Record, bool, bool)
 	Delete(record *data.Record) ([]*data.Record, bool, error)
 	Put(record *data.Record) ([]*data.Record, bool, error)
 	LoadFromWal(records []*data.Record) ([][]*data.Record, error)
