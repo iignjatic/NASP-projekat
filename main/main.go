@@ -111,7 +111,7 @@ func main() {
 	}
 
 	files, _ := ioutil.ReadDir("../SSTable/files")
-	numOfSSTables := len(files) / 3
+	numOfSSTables := len(files)
 
 	//var input uint32
 	//var key string
