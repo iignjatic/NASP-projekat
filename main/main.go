@@ -67,7 +67,8 @@ func main() {
 	var SUMMARY_SAMPLE uint64 = 5
 	var MAX_TOKENS int64 = 10
 	var RESET_INTERVAL int64 = 30
-
+	var showBlocks bool = false
+	
 	config, err := LoadConfig("../config.json")
 	if err != nil {
 		log.Fatalf("Failed to unmarshal JSON: %v", err)
@@ -333,20 +334,7 @@ func main() {
 			}
 
 		}
-		for i := 0; i < len(w.Segments); i++ {
-			fmt.Printf("\n----------------------Segment %d----------------------\n", w.Segments[i].ID)
-			w.Segments[i].PrintBlocks()
-		}
-		fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-		fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
-		defragmentedRecords, err := w.ReadAllSegmentsCP(false)
-		if err != nil {
-			fmt.Printf("Segment deserialization failed: %v\n", err)
-			return
-		}
-		for i := 0; i < len(defragmentedRecords); i++ {
-			fmt.Println(defragmentedRecords[i])
-		}
+		w.ShowBlocks(showBlocks)
 		//fmt.Println("TOKENBUCKET JE NAPRAVLJEN I DODAT U SISTEM PRILIKOM POKRETANJA APLIKACIJE")
 	}
 
@@ -368,8 +356,8 @@ func main() {
 			fmt.Println("Greška: nije broj.")
 			return
 		}
-		//fmt.Scan(&input)
-		//input = 3
+		// fmt.Scan(&input)
+		// input = 3
 
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// RADIM GET ZA TOKENBUCKET
@@ -576,20 +564,7 @@ func main() {
 				}
 
 			}
-			for i := 0; i < len(w.Segments); i++ {
-				fmt.Printf("\n----------------------Segment %d----------------------\n", w.Segments[i].ID)
-				w.Segments[i].PrintBlocks()
-			}
-			fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-			fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
-			defragmentedRecords, err := w.ReadAllSegmentsCP(false)
-			if err != nil {
-				fmt.Printf("Segment deserialization failed: %v\n", err)
-				return
-			}
-			for i := 0; i < len(defragmentedRecords); i++ {
-				fmt.Println(defragmentedRecords[i])
-			}
+			w.ShowBlocks(showBlocks)
 
 			//fmt.Println("TOKENBUCKET JE AZURIRAN U SISTEMU POSLE GET OPERACIJE")
 
@@ -795,20 +770,7 @@ func main() {
 				}
 
 			}
-			for i := 0; i < len(w.Segments); i++ {
-				fmt.Printf("\n----------------------Segment %d----------------------\n", w.Segments[i].ID)
-				w.Segments[i].PrintBlocks()
-			}
-			fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-			fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
-			defragmentedRecords, err := w.ReadAllSegmentsCP(false)
-			if err != nil {
-				fmt.Printf("Segment deserialization failed: %v\n", err)
-				return
-			}
-			for i := 0; i < len(defragmentedRecords); i++ {
-				fmt.Println(defragmentedRecords[i])
-			}
+			w.ShowBlocks(showBlocks)
 
 		} else if input == 3 {
 			// delete
@@ -925,20 +887,7 @@ func main() {
 					w.DeleteFullyFlushedSegments(flushInfo)
 				}
 			}
-			for i := 0; i < len(w.Segments); i++ {
-				fmt.Printf("\n----------------------Segment %d----------------------\n", w.Segments[i].ID)
-				w.Segments[i].PrintBlocks()
-			}
-			fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-			fmt.Print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
-			defragmentedRecords, err := w.ReadAllSegmentsCP(false)
-			if err != nil {
-				fmt.Printf("Segment deserialization failed: %v\n", err)
-				return
-			}
-			for i := 0; i < len(defragmentedRecords); i++ {
-				fmt.Println(defragmentedRecords[i])
-			}
+			w.ShowBlocks(showBlocks)
 
 		} else if input == 4 {
 			reader := bufio.NewReader(os.Stdin)
@@ -1013,5 +962,5 @@ func main() {
 
 		}
 
-	}
+ 	}
 }

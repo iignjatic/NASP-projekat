@@ -38,6 +38,12 @@ type Wal struct {
 }
 
 func NewWal(bm *BlockManager.BlockManager, blockSize, blocksPerSegment uint64) *Wal {
+	if _, err := os.Stat(DIRECTORY_PATH); os.IsNotExist(err) {
+		err := os.MkdirAll(DIRECTORY_PATH, os.ModePerm)
+		if err != nil {
+			panic("Directory cannot be made: " + err.Error())
+		}
+	}
 	w := &Wal{
 		DirectoryPath:    DIRECTORY_PATH,
 		Segments:         []*Segment{},
@@ -267,6 +273,9 @@ func (w *Wal) ReadSegmentFromFile(filePath string, offset int64, useCheckpoint b
 
 			keySize := binary.LittleEndian.Uint64(data1[i+data.KEY_SIZE_START:])
 			valueSize := binary.LittleEndian.Uint64(data1[i+data.VALUE_SIZE_START:])
+			if keySize > 1<<30 || valueSize > 1<<40 {
+				break
+			}
 			totalSize := data.KEY_START + int(keySize) + int(valueSize)
 
 			j := i
@@ -452,4 +461,22 @@ func (w *Wal) DeleteFullyFlushedSegments(info Flush) error {
 		i++
 	}
 	return nil
+}
+
+func (w *Wal) ShowBlocks(showBlocks bool) {
+	if showBlocks {
+		for i := 0; i < len(w.Segments); i++ {
+		fmt.Printf("\n========= Segment %d =========\n", w.Segments[i].ID)
+		w.Segments[i].PrintBlocks()
+		}
+		fmt.Println("\n********** Defragmented Records **********")
+		defragmentedRecords, err := w.ReadAllSegmentsCP(false)
+		if err != nil {
+			fmt.Printf("Segment deserialization failed: %v\n", err)
+			return
+		}
+		for i := 0; i < len(defragmentedRecords); i++ {
+			fmt.Println(defragmentedRecords[i])
+		}
+	}
 }
