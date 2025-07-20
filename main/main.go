@@ -33,6 +33,26 @@ type Config struct {
 	MaxTokens        int64  `json:"MaxTokens"`
 	ResetInterval    int64  `json:"ResetInterval"`
 }
+type KeyValuePair struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func LoadKeyValuePairsFromJSON(filePath string) ([]KeyValuePair, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var pairs []KeyValuePair
+	err = json.Unmarshal(data, &pairs)
+	if err != nil {
+		return nil, err
+	}
+
+	return pairs, nil
+}
+
 
 func LoadConfig(path string) (Config, error) {
 	var config Config
@@ -346,6 +366,7 @@ func main() {
 		fmt.Println("2. PUT [ key, value] ")
 		fmt.Println("3. DELETE [ key ]")
 		fmt.Println("4. PROVJERA INTEGRITETA PODATAKA [ naziv  SSTable-a npr. sstable_1]")
+		fmt.Println("5. AUTOMATIZOVAN UNOS PODATAKA")
 
 		reader := bufio.NewReader(os.Stdin)
 		num, _ := reader.ReadString('\n')
@@ -960,6 +981,118 @@ func main() {
 
 			}
 
+		}else if input == 5{
+			pairs, err := LoadKeyValuePairsFromJSON("../generated_inputs.json")
+			if err != nil {
+				log.Fatalf("Greška pri čitanju JSON fajla: %v", err)
+			}
+
+			for _, pair := range pairs {
+				key := pair.Key
+				value := []byte(pair.Value)
+
+
+				if key == tokenBucketKey {
+					fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
+					continue
+				}
+
+				// write to WAL
+				rec := data.NewRecord(key, []byte(value))
+				w.AddRecord(rec)
+
+				// write to MemTable
+				flushedRecords, flush, err := memtable.Put(wal.NoZerosRecord(data.DeepCopyRecord(rec)))
+				if err != nil {
+					panic(err)
+				}
+
+				if len(flushedRecords) > 0 {
+					for i, record := range flushedRecords {
+						fmt.Printf("Element %d: %+v\n", i, record)
+					}
+				} else {
+					fmt.Printf("Prazan niz")
+				}
+
+				recordCache.Put(key, []byte(value)) // ovdje sam dodao upis u recordCache
+				//fmt.Println("ZAPIS JE DODAT U SISTEM PRILIKOM PUT OPERACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO KEY I VALUE ", key, string(value))
+
+				if flush {
+					// flushedRecords je niz pokazivaca za sstable
+					numOfSSTables++
+					newSSTable := "sstable_" + strconv.Itoa(numOfSSTables)
+					sstPath := "../SSTable/files/" + newSSTable
+
+					metadataPath := "../SSTable/files/" + newSSTable + "/metadata" + strconv.Itoa(numOfSSTables)
+
+					err := os.MkdirAll(sstPath, 0755)
+					if err != nil {
+						fmt.Println("Error creating folder:", err)
+						return
+					}
+
+					err2 := os.MkdirAll(metadataPath, 0755)
+					if err2 != nil {
+						fmt.Println("Error creating metadata folder:", err)
+						return
+					}
+
+					sst := &SSTable.SSTable{
+						DataSegment:     dataSeg,
+						Index:           index,
+						Summary:         summary,
+						BlockManager:    blockManager,
+						DataFilePath:    "../SSTable/files/" + newSSTable + "/data" + strconv.Itoa(numOfSSTables) + ".bin",
+						IndexFilePath:   "../SSTable/files/" + newSSTable + "/index" + strconv.Itoa(numOfSSTables) + ".bin",
+						SummaryFilePath: "../SSTable/files/" + newSSTable + "/summary" + strconv.Itoa(numOfSSTables) + ".bin",
+						BlockSize:       BLOCK_SIZE,
+					}
+
+					sst.MakeSSTable(flushedRecords)
+					sst.Index = index
+					sst.Summary = summary
+					sst.WriteSSTable()
+
+					// //  ucitavanje blokova iz fajla
+					dataBlocks := dataSeg.BlocksToMerkle("../SSTable/files/" + newSSTable + "/data" + strconv.Itoa(numOfSSTables) + ".bin")
+
+					// // pravim listove stabla
+					dataLeafNodes := merkleStablo.CreateLeafNodes(dataBlocks)
+
+					// // 	//  pravim originalno Merkle stablo
+					dataOriginalRoot := merkleStablo.BuildMerkleTreeBottomUp(dataLeafNodes)
+
+					// // kreiram MerkleTree objekat
+					//dataOriginalTree := &merkleStablo.MerkleTree{Root: dataOriginalRoot}
+					//fmt.Printf("Korjen hash-a: %x\n", dataOriginalTree.Root.Hash)
+
+					dataSerializeFileName := metadataPath + "/merkle_tree" + strconv.Itoa(numOfSSTables) + ".bin"
+
+					// // otvaranje fajla za pisanje
+					dataFile, err := os.Create(dataSerializeFileName)
+					if err != nil {
+						log.Fatalf("Greska pri kreiranju fajla: %v", err)
+					}
+					defer dataFile.Close() // Automatski zatvara fajl na kraju
+
+					// // serijalizacija Merkle stabla
+					err = merkleStablo.SerializeMerkleTree(dataOriginalRoot, dataFile)
+					if err != nil {
+						log.Fatalf("Greska pri serijalizaciji: %v", err)
+					}
+
+					flushInfo, err := w.CreateFlushInfo(flushedRecords)
+					if err != nil {
+						fmt.Println("Greska pri kreiranju FlushInfo:", err)
+					} else {
+						wal.SaveFlushInfoToFile(flushInfo)
+						w.DeleteFullyFlushedSegments(flushInfo)
+					}
+
+				}
+				w.ShowBlocks(showBlocks)
+			}
 		}
 
  	}
