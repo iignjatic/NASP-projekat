@@ -134,14 +134,22 @@ func (mm *MemtableManagerHM) Put(record *data.Record) ([]*data.Record, bool, err
 		return nil, false, errors.New("cannot add to a read-only memtable")
 	}
 
+	rec, exists := activeMemtable.Get(record.Key)
+	if exists {
+		rec.Value = record.Value
+		rec.Tombstone = false
+		activeMemtable.data[record.Key] = rec
+		return nil, false, nil
+	}
+
 	var flushedRecords []*data.Record
 
 	if activeMemtable.IsFull() {
-		rec, err := mm.RotateMemtables()
+		records, err := mm.RotateMemtables()
+		flushedRecords = records
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to rotate memtables: %w", err)
 		}
-		flushedRecords = rec
 		activeMemtable = mm.tables[mm.acitveIndex]
 	}
 
@@ -149,19 +157,11 @@ func (mm *MemtableManagerHM) Put(record *data.Record) ([]*data.Record, bool, err
 		return nil, false, err
 	}
 
-	if activeMemtable.currentSize == activeMemtable.maxSize && mm.MemtableManagerIsFull() {
-		rec, err := mm.RotateMemtables()
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to rotate memtables: %w", err)
-		} else {
-			flushedRecords = rec
-		}
-	}
-	// ako se nesto nalazi u flushedRecords znaci da se treba uraditi flush
-	if flushedRecords != nil {
+	if len(flushedRecords) > 0 {
 		return flushedRecords, true, nil
 	}
-	return flushedRecords, false, nil
+
+	return nil, false, nil
 }
 
 // rotira memtabele, kada su sve popunjene "najstarija" tabela se flush-uje

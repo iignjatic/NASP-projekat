@@ -5,7 +5,6 @@ import (
 	"NASP-PROJEKAT/data"
 	"errors"
 	"fmt"
-	"math"
 )
 
 type MemtableB struct {
@@ -24,7 +23,7 @@ type MemtableManagerB struct {
 
 func CreateMemtableB(maxSize uint, readOnly bool) *MemtableB {
 	return &MemtableB{
-		data:        b_tree.NewBTree(int(math.Sqrt(float64(maxSize)))),
+		data:        b_tree.NewBTree(4),
 		maxSize:     maxSize,
 		readOnly:    readOnly,
 		currentSize: 0,
@@ -83,7 +82,7 @@ func (memt *MemtableB) Flush() ([]*data.Record, error) {
 	records := memt.data.GetSortedRecords()
 
 	// praznjenje memtable
-	memt.data = b_tree.NewBTree(int(math.Sqrt(float64(memt.maxSize))))
+	memt.data = b_tree.NewBTree(4)
 	memt.currentSize = 0
 	return records, nil
 }
@@ -126,14 +125,22 @@ func (mm *MemtableManagerB) Put(record *data.Record) ([]*data.Record, bool, erro
 		return nil, false, errors.New("cannot add to a read-only memtable")
 	}
 
+	rec, exists := activeMemtable.Get(record.Key)
+	if exists {
+		rec.Value = record.Value
+		rec.Tombstone = false
+		activeMemtable.data.InsertRecord(rec)
+		return nil, false, nil
+	}
+
 	var flushedRecords []*data.Record
 
 	if activeMemtable.IsFull() {
-		rec, err := mm.RotateMemtables()
+		records, err := mm.RotateMemtables()
+		flushedRecords = records
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to rotate memtables: %w", err)
 		}
-		flushedRecords = rec
 		activeMemtable = mm.tables[mm.acitveIndex]
 	}
 
@@ -141,18 +148,12 @@ func (mm *MemtableManagerB) Put(record *data.Record) ([]*data.Record, bool, erro
 		return nil, false, err
 	}
 
-	if activeMemtable.currentSize == activeMemtable.maxSize && mm.MemtableManagerIsFull() {
-		rec, err := mm.RotateMemtables()
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to rotate memtables: %w", err)
-		}
-		flushedRecords = rec
-	}
 	// ako se nesto nalazi u flushedRecords znaci da se treba uraditi flush
-	if flushedRecords != nil {
+	if len(flushedRecords) > 0 {
 		return flushedRecords, true, nil
 	}
-	return flushedRecords, false, nil
+
+	return nil, false, nil
 }
 
 // rotira memtabele, kada su sve popunjene "najstarija" tabela se flush-uje
@@ -172,11 +173,10 @@ func (mm *MemtableManagerB) RotateMemtables() ([]*data.Record, error) {
 
 		//mm.acitveIndex = mm.oldestIndex
 		mm.oldestIndex = (mm.oldestIndex + 1) % mm.maxTables
-	} else {
-		mm.tables[mm.acitveIndex].readOnly = true
-		mm.acitveIndex = (mm.acitveIndex + 1) % mm.maxTables
-		mm.tables[mm.acitveIndex].readOnly = false
 	}
+	mm.tables[mm.acitveIndex].readOnly = true
+	mm.acitveIndex = (mm.acitveIndex + 1) % mm.maxTables
+	mm.tables[mm.acitveIndex].readOnly = false
 
 	return records, nil
 }
