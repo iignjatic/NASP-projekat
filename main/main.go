@@ -809,7 +809,7 @@ func main() {
 			w.AddRecord(rec)
 
 			// write to MemTable
-			flushedRecords, flush, err := memtable.Put(wal.NoZerosRecord(data.DeepCopyRecord(rec)))
+			flushedRecords, flush, err := memtable.Delete(wal.NoZerosRecord(data.DeepCopyRecord(rec)))
 			if err != nil {
 				panic(err)
 			}
