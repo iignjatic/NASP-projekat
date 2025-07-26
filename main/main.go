@@ -53,7 +53,6 @@ func LoadKeyValuePairsFromJSON(filePath string) ([]KeyValuePair, error) {
 	return pairs, nil
 }
 
-
 func LoadConfig(path string) (Config, error) {
 	var config Config
 
@@ -88,7 +87,7 @@ func main() {
 	var MAX_TOKENS int64 = 10
 	var RESET_INTERVAL int64 = 30
 	var showBlocks bool = false
-	
+
 	config, err := LoadConfig("../config.json")
 	if err != nil {
 		log.Fatalf("Failed to unmarshal JSON: %v", err)
@@ -707,14 +706,6 @@ func main() {
 				panic(err)
 			}
 
-			if len(flushedRecords) > 0 {
-				for i, record := range flushedRecords {
-					fmt.Printf("Element %d: %+v\n", i, record)
-				}
-			} else {
-				fmt.Printf("Prazan niz")
-			}
-
 			recordCache.Put(key, []byte(value)) // ovdje sam dodao upis u recordCache
 			//fmt.Println("ZAPIS JE DODAT U SISTEM PRILIKOM PUT OPERACIJE I UPISAN U RECORDCACHE, U RECORDCACHE SAM DODAO KEY I VALUE ", key, string(value))
 
@@ -821,14 +812,6 @@ func main() {
 			flushedRecords, flush, err := memtable.Put(wal.NoZerosRecord(data.DeepCopyRecord(rec)))
 			if err != nil {
 				panic(err)
-			}
-
-			if len(flushedRecords) > 0 {
-				for i, record := range flushedRecords {
-					fmt.Printf("Element %d: %+v\n", i, record)
-				}
-			} else {
-				fmt.Printf("Prazan niz")
 			}
 
 			if flush {
@@ -981,7 +964,7 @@ func main() {
 
 			}
 
-		}else if input == 5{
+		} else if input == 5 {
 			pairs, err := LoadKeyValuePairsFromJSON("../generated_inputs.json")
 			if err != nil {
 				log.Fatalf("Greška pri čitanju JSON fajla: %v", err)
@@ -990,7 +973,6 @@ func main() {
 			for _, pair := range pairs {
 				key := pair.Key
 				value := []byte(pair.Value)
-
 
 				if key == tokenBucketKey {
 					fmt.Println("Korisniku je zabranjena bilo kakva manipulacija sa tokenBucketom")
@@ -1005,14 +987,6 @@ func main() {
 				flushedRecords, flush, err := memtable.Put(wal.NoZerosRecord(data.DeepCopyRecord(rec)))
 				if err != nil {
 					panic(err)
-				}
-
-				if len(flushedRecords) > 0 {
-					for i, record := range flushedRecords {
-						fmt.Printf("Element %d: %+v\n", i, record)
-					}
-				} else {
-					fmt.Printf("Prazan niz")
 				}
 
 				recordCache.Put(key, []byte(value)) // ovdje sam dodao upis u recordCache
@@ -1095,5 +1069,5 @@ func main() {
 			}
 		}
 
- 	}
+	}
 }
