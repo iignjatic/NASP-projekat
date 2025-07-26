@@ -95,13 +95,11 @@ func (node *BTreeNode) search(key string) (int, bool) {
 func (t *BTree) Get(key string) (*data.Record, error) {
 	for next := t.root; next != nil; {
 		index, found := next.search(key)
-		fmt.Printf("u funkciji get indeks: %d i found: %t", index, found)
 		if found {
 			return next.records[index], nil
 		}
 
 		if len(next.children) == 0 {
-			fmt.Println("usla u petlju if len(next.children) == 0")
 			return nil, errors.New("key not found")
 		}
 
@@ -299,7 +297,6 @@ func (tree *BTree) InOrderTraversal(node *BTreeNode, records *[]*data.Record) {
 			tree.InOrderTraversal(node.children[i], records)
 		}
 
-		//fmt.Printf("Key='%s', Value='%s'\n", node.records[i].Key, string(node.records[i].Value))
 		*records = append(*records, node.records[i])
 	}
 
